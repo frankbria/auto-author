@@ -13,7 +13,7 @@ import type { Editor } from '@tiptap/react';
 import { ChapterEditor } from '../ChapterEditor';
 import bookClient from '@/lib/api/bookClient';
 import { authClient } from '@/lib/auth-client';
-import { endSignOut, signOutOrNotify, UNSAVED_WRITING_WARNING } from '@/lib/sign-out';
+import { endSignOut, resetLeavingSavesForTests, signOutOrNotify, UNSAVED_WRITING_WARNING } from '@/lib/sign-out';
 import { apiFetch, browser, resetUnauthorizedForTests } from '@/lib/api/unauthorized';
 
 jest.unmock('@tiptap/react');
@@ -68,6 +68,7 @@ beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
   endSignOut();
+  resetLeavingSavesForTests();
   resetUnauthorizedForTests();
   jest.useFakeTimers();
   jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -153,6 +154,37 @@ describe('ChapterEditor: signing out from a book page (#1091)', () => {
     });
 
     expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('the autosave does not fire while the sign-out flush runs', async () => {
+    let finishFlush: (value: SaveResult) => void = () => {};
+    mockBookClient.saveChapterContent.mockImplementationOnce(
+      () => new Promise((resolve) => (finishFlush = resolve)) as never
+    );
+    mockBookClient.saveChapterContent.mockResolvedValue({ last_modified: 'T3' } as SaveResult);
+    const view = await openWithUnsavedEdit();
+
+    let signedOut: Promise<boolean> = Promise.resolve(false);
+    await act(async () => {
+      signedOut = signOutOrNotify();
+    });
+    expect(mockBookClient.saveChapterContent).toHaveBeenCalledTimes(1);
+    // Well past the autosave delay while the flush is still out.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(10_000);
+    });
+    expect(mockBookClient.saveChapterContent).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      finishFlush({ last_modified: 'T2' } as SaveResult);
+    });
+    expect(await signedOut).toBe(true);
+    expect(confirmSpy).not.toHaveBeenCalled();
+    view.unmount();
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    expect(mockBookClient.saveChapterContent).toHaveBeenCalledTimes(1);
   });
 
   it('on no, stays signed in and keeps the backup', async () => {

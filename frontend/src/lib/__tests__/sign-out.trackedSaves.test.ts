@@ -1,23 +1,39 @@
 import { authClient } from '@/lib/auth-client';
-import { beforeSignOut, endSignOut, signOutOrNotify, trackSave } from '@/lib/sign-out';
+import {
+  beforeSignOut,
+  endSignOut,
+  resetLeavingSavesForTests,
+  savedNow,
+  signOutCount,
+  signOutOrNotify,
+  trackSave,
+  UNSAVED_WRITING_WARNING,
+} from '@/lib/sign-out';
 
 const mockSignOut = authClient.signOut as jest.Mock;
 
 /**
- * #1091: a save handed off while the beforeSignOut handlers run (an editor that
- * closes mid-sign-out) is waited for too, not only the ones already running.
+ * #1091: saves from editors already closed (their leaving saves). A sign-out
+ * waits for them, including one handed off while the handlers run, and asks
+ * about one that failed even when the browser kept no backup of it.
  */
 describe('signOutOrNotify and tracked saves', () => {
+  let confirmSpy: jest.SpyInstance;
+
   beforeEach(() => {
     jest.clearAllMocks();
     endSignOut();
+    resetLeavingSavesForTests();
     mockSignOut.mockResolvedValue({ data: {}, error: null });
+    confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
   });
 
+  afterEach(() => confirmSpy.mockRestore());
+
   it('waits for a save tracked while the handlers run before signing out', async () => {
-    let finishLate: () => void = () => {};
+    let finishLate: (saved: boolean) => void = () => {};
     const stop = beforeSignOut(async () => {
-      void trackSave(new Promise<void>((resolve) => (finishLate = resolve)));
+      void trackSave('chapter:bk/A', new Promise<boolean>((resolve) => (finishLate = resolve)));
       return false;
     });
 
@@ -25,9 +41,36 @@ describe('signOutOrNotify and tracked saves', () => {
     for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(mockSignOut).not.toHaveBeenCalled();
 
-    finishLate();
+    finishLate(true);
     expect(await signedOut).toBe(true);
     expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(confirmSpy).not.toHaveBeenCalled();
     stop();
+  });
+
+  it('asks about a leaving save that failed before the sign-out began', async () => {
+    await trackSave('summary:bk', Promise.resolve(false));
+
+    expect(await signOutOrNotify()).toBe(false);
+    expect(confirmSpy).toHaveBeenCalledWith(UNSAVED_WRITING_WARNING);
+    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it('does not ask once that text has been saved since', async () => {
+    await trackSave('summary:bk', Promise.resolve(false));
+    savedNow('summary:bk');
+
+    expect(await signOutOrNotify()).toBe(true);
+    expect(confirmSpy).not.toHaveBeenCalled();
+  });
+
+  it('a save from an editor opened before an earlier sign-out marks nothing', async () => {
+    confirmSpy.mockReturnValue(true);
+    await signOutOrNotify(); // the earlier sign-out
+    jest.clearAllMocks();
+    await trackSave('chapter:bk/A', Promise.resolve(false), signOutCount() - 1);
+
+    expect(await signOutOrNotify()).toBe(true);
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 });

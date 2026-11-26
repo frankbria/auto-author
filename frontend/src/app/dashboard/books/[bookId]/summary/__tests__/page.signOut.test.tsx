@@ -5,7 +5,7 @@ import '@testing-library/jest-dom';
 import BookSummaryPage from '../page';
 import bookClient from '@/lib/api/bookClient';
 import { authClient } from '@/lib/auth-client';
-import { endSignOut, signOutOrNotify, UNSAVED_WRITING_WARNING } from '@/lib/sign-out';
+import { endSignOut, resetLeavingSavesForTests, signOutOrNotify, UNSAVED_WRITING_WARNING } from '@/lib/sign-out';
 
 jest.mock('@/lib/api/bookClient');
 jest.mock('@/lib/toast', () => ({ toast: jest.fn() }));
@@ -56,6 +56,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   localStorage.clear();
   endSignOut();
+  resetLeavingSavesForTests();
   jest.useFakeTimers();
   confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
   mockSignOut.mockResolvedValue({ data: {}, error: null });
@@ -135,6 +136,28 @@ describe('BookSummaryPage: signing out (#1091)', () => {
     expect(await signedOut).toBe(false);
     expect(confirmSpy).toHaveBeenCalledWith(UNSAVED_WRITING_WARNING);
     expect(localStorage.getItem(UNSAVED)).toBe('Typed, then left');
+  });
+
+  it('asks about a leaving save that failed while the browser could not keep a copy', async () => {
+    mockedClient.saveBookSummary.mockRejectedValue(new Error('Network error'));
+    confirmSpy.mockReturnValue(false);
+    const view = await openedAndTyped('Typed, then left');
+    const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError');
+    });
+    view.unmount();
+    await act(async () => {});
+    setItem.mockRestore();
+    expect(localStorage.getItem(UNSAVED)).toBeNull();
+
+    let signedOut = true;
+    await act(async () => {
+      signedOut = await signOutOrNotify();
+    });
+
+    expect(signedOut).toBe(false);
+    expect(confirmSpy).toHaveBeenCalledWith(UNSAVED_WRITING_WARNING);
+    expect(mockSignOut).not.toHaveBeenCalled();
   });
 
   it('a leaving save waits behind a save still running, and sign-out waits for both', async () => {

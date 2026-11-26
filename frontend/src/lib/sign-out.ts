@@ -50,19 +50,39 @@ export function beforeSignOut(handler: BeforeSignOut): () => void {
 }
 
 const pendingSaves = new Set<Promise<unknown>>();
+// What a failed leaving save left unsaved, by key: kept here as well as in the
+// browser's backup, since storing that backup can itself fail (full storage).
+const leftUnsavedOnLeaving = new Set<string>();
 
 /**
- * A save from a page or editor that is already gone (its leaving flush, #1091).
- * No beforeSignOut handler covers it any more, so a sign-out waits for it
- * before deciding: a failure then leaves its backup in time to be asked about.
+ * A save from a page or editor that is already gone (its leaving flush, #1091),
+ * resolving whether its text reached the server. No beforeSignOut handler
+ * covers it any more, so a sign-out waits for it before deciding, and asks if
+ * it failed, even when no backup could be stored. `key` names the text (one
+ * chapter, one summary), so a later save of it clears the mark (savedNow).
+ * `startedIn`: the signOutCount() its editor opened in; a save from an editor
+ * that outlived a sign-out marks nothing.
  */
-export function trackSave<T>(save: Promise<T>): Promise<T> {
+export function trackSave(key: string, save: Promise<boolean>, startedIn = signOutCount()): Promise<boolean> {
   pendingSaves.add(save);
-  const settled = () => {
+  const settled = (saved: boolean) => {
     pendingSaves.delete(save);
+    if (signOuts !== startedIn) return;
+    if (saved) leftUnsavedOnLeaving.delete(key);
+    else leftUnsavedOnLeaving.add(key);
   };
-  save.then(settled, settled);
+  save.then(settled, () => settled(false));
   return save;
+}
+
+/** Tests only: forget failed leaving saves from an earlier test. */
+export function resetLeavingSavesForTests() {
+  leftUnsavedOnLeaving.clear();
+}
+
+/** The text under `key` has reached the server since a leaving save failed. */
+export function savedNow(key: string) {
+  leftUnsavedOnLeaving.delete(key);
 }
 
 /** Waits until no tracked save is running, including ones started meanwhile. */
@@ -102,7 +122,7 @@ export async function signOutOrNotify({
   );
   // An editor closed while the handlers ran hands its edit to a leaving save.
   await settleTrackedSaves();
-  const unsaved = leftUnsaved.includes(true) || hasUnsavedLocalWriting();
+  const unsaved = leftUnsaved.includes(true) || leftUnsavedOnLeaving.size > 0 || hasUnsavedLocalWriting();
   if (unsaved && !window.confirm(UNSAVED_WRITING_WARNING)) return false;
   underwayUntil = Infinity;
   const failed = await authClient.signOut().then(
@@ -117,6 +137,7 @@ export async function signOutOrNotify({
     signOuts += 1;
     closeTermsExits();
     clearLocalWriting();
+    leftUnsavedOnLeaving.clear();
   }
   if (failed && !quiet) {
     toast({

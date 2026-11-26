@@ -18,7 +18,7 @@ import {
 import { useSpeechRecognitionSupported } from '@/lib/voice/useSpeechRecognitionSupported';
 import { SummarySaveNotices } from '@/components/books/SummarySaveNotices';
 import { readStored, removeStored, writeStored } from '@/lib/storage/safeLocalStorage';
-import { beforeSignOut, signOutCount, trackSave } from '@/lib/sign-out';
+import { beforeSignOut, savedNow, signOutCount, trackSave } from '@/lib/sign-out';
 
 // Where a summary whose save failed is kept (#832): apart from the working copy,
 // which every load and every keystroke writes over.
@@ -72,7 +72,7 @@ export default function BookSummaryPage() {
     shownBookRef.current = bookId;
   }, [bookId]);
   const saveInFlight = useRef(false);
-  const savingRef = useRef<Promise<void> | null>(null);
+  const savingRef = useRef<Promise<boolean> | null>(null);
   // The sign-out count this page opened in (#1091). Once the user has signed
   // out, the page may stay up until the next one replaces it; nothing it does
   // meanwhile (a keystroke, a dictation result, a retry, a late failure) writes
@@ -85,21 +85,25 @@ export default function BookSummaryPage() {
   }, [summary]);
   const persist = useCallback((text: string) => {
     saveInFlight.current = true;
+    // Resolves whether the text reached the server.
     const saving = bookClient.saveBookSummary(bookId, text)
       .then((data) => {
+        savedNow(`summary:${bookId}`);
         // A save of another book says nothing about the one on screen.
-        if (shownBookRef.current !== bookId) return;
+        if (shownBookRef.current !== bookId) return true;
         lastSaved.current = data.summary;
         if (!draftOnOffer.current) removeStored(unsavedKey(bookId));
         setSaveFailure(null);
+        return true;
       })
       .catch(() => {
-        if (signOutCount() !== openedIn.current) return;
+        if (signOutCount() !== openedIn.current) return false;
         // The text exists only here now. It is kept under its own key, which the
         // next load does not write over, and the writer is told (#832). Kept for
         // its own book whichever book is on screen; told only if it is this one.
         const kept = writeStored(unsavedKey(bookId), text);
         if (shownBookRef.current === bookId) setSaveFailure({ kept });
+        return false;
       })
       .finally(() => {
         saveInFlight.current = false;
@@ -234,7 +238,7 @@ export default function BookSummaryPage() {
       if (signOutCount() !== openedIn.current) return;
       // Behind a save still running, since the server keeps whichever lands last.
       const earlier = saveInFlight.current ? savingRef.current : null;
-      void trackSave(earlier ? earlier.then(() => persist(text)) : persist(text));
+      void trackSave(`summary:${bookId}`, earlier ? earlier.then(() => persist(text)) : persist(text), openedIn.current);
     },
     [bookId, persist]
   );

@@ -8,7 +8,7 @@ import bookClient, { type ChapterSaveConflict } from '@/lib/api/bookClient';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
 import { AUTO_SAVE_DEFAULT_SECONDS, isValidAutoSaveInterval } from '@/lib/constants/auto-save';
-import { beforeSignOut, signOutCount, trackSave } from '@/lib/sign-out';
+import { beforeSignOut, savedNow, signOutCount, trackSave } from '@/lib/sign-out';
 import {
   validateChapterBackup,
   getValidatedItem,
@@ -300,23 +300,33 @@ export function useChapterContent({
       beforeSignOut(async () => {
         // A save in flight settles first, so a failure is backed up and asked about.
         await inFlightSaveRef.current?.catch(() => {});
+        // The autosave must not fire while these flushes run: it would resend the
+        // same edit on the same token, and the second to land is answered 409.
+        // isSaving keeps it from re-arming; a leaving save waits on inFlightSaveRef.
+        clearTimeout(autoSaveTimerRef.current);
+        setIsSaving(true);
         let tried: PendingChapterEdit | null = null;
-        for (let round = 0; round < 3; round++) {
-          const edit = unsavedRef.current;
-          // Nothing pending, or this edit already failed: stop and report it.
-          if (!edit || edit === tried) break;
-          tried = edit;
-          const saved = await flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
-          if (!saved) continue;
-          // What markSaved records, since the user may still cancel the sign-out
-          // and keep writing from here.
-          autoSaveFailuresRef.current = 0;
-          setLastAutoSavedContent(edit.content);
-          if (unsavedRef.current === edit) {
-            unsavedRef.current = null;
-            setAutoSavePending(false);
-            setHasUnsavedChanges(false);
+        try {
+          for (let round = 0; round < 3; round++) {
+            const edit = unsavedRef.current;
+            // Nothing pending, or this edit already failed: stop and report it.
+            if (!edit || edit === tried) break;
+            tried = edit;
+            const flush = flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
+            inFlightSaveRef.current = flush;
+            if (!(await flush)) continue;
+            // What markSaved records, since the user may still cancel the sign-out
+            // and keep writing from here.
+            autoSaveFailuresRef.current = 0;
+            setLastAutoSavedContent(edit.content);
+            if (unsavedRef.current === edit) {
+              unsavedRef.current = null;
+              setAutoSavePending(false);
+              setHasUnsavedChanges(false);
+            }
           }
+        } finally {
+          setIsSaving(false);
         }
         setBackupWrites((n) => n + 1);
         return unsavedRef.current !== null;
@@ -333,7 +343,11 @@ export function useChapterContent({
       unsavedRef.current = null;
       autoSaveFailuresRef.current = 0;
       if (edit) {
-        void trackSave(flushChapterContent(edit, seenRef.current, inFlightSaveRef.current, sessionRef.current));
+        void trackSave(
+          `chapter:${bookId}/${chapterId}`,
+          flushChapterContent(edit, seenRef.current, inFlightSaveRef.current, sessionRef.current),
+          sessionRef.current
+        );
       }
     },
     [bookId, chapterId]
@@ -359,6 +373,7 @@ export function useChapterContent({
   // autosave effect re-arms for it because lastAutoSavedContent changed (#757).
   const markSaved = (content: string) => {
     saveSucceeded();
+    savedNow(`chapter:${bookId}/${chapterId}`);
     autoSaveFailuresRef.current = 0;
     setLastAutoSavedContent(content);
     if (editor?.getHTML() !== content) return;
