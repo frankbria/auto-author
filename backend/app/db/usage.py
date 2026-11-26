@@ -6,12 +6,15 @@ Increments are atomic (`$inc` upsert) so racing generations can't undercount.
 A TTL index on `expires_at` reaps stale buckets so the collection stays bounded.
 """
 
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
 from pymongo import ReturnDocument
 
 from .base import get_collection
+
+logger = logging.getLogger(__name__)
 
 # ponytail: ensure the TTL index once per process on first use. Idempotent, and
 # cheap — avoids wiring a startup hook just for one collection.
@@ -26,6 +29,17 @@ async def _usage_collection():
         await coll.create_index("expires_at", expireAfterSeconds=0)
         _ttl_index_ensured = True
     return coll
+
+
+async def ensure_usage_indexes() -> None:
+    """Index usage_counters on ``user_id`` (#1318): account deletion and the
+    account export filter on it alone. Idempotent, run at startup; a failure is
+    logged and never fatal (the queries work unindexed, just slower)."""
+    try:
+        coll = await get_collection("usage_counters")
+        await coll.create_index("user_id", name="usage_user_idx")
+    except Exception:
+        logger.error("Failed to create user_id index on usage_counters", exc_info=True)
 
 
 async def increment_usage(user_id: str, period_key: str, ttl_seconds: Optional[int]) -> int:
