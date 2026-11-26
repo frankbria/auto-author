@@ -12,9 +12,10 @@ jest.mock('@/lib/toast', () => ({ toast: jest.fn() }));
 jest.mock('@/lib/voice/useSpeechRecognitionSupported', () => ({
   useSpeechRecognitionSupported: () => false,
 }));
+let mockBookId = 'book-1';
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
-  useParams: () => ({ bookId: 'book-1' }),
+  useParams: () => ({ bookId: mockBookId }),
 }));
 
 const mockedClient = bookClient as jest.Mocked<typeof bookClient>;
@@ -57,6 +58,7 @@ beforeEach(() => {
   localStorage.clear();
   endSignOut();
   resetLeavingSavesForTests();
+  mockBookId = 'book-1';
   jest.useFakeTimers();
   confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
   mockSignOut.mockResolvedValue({ data: {}, error: null });
@@ -158,6 +160,37 @@ describe('BookSummaryPage: signing out (#1091)', () => {
     expect(signedOut).toBe(false);
     expect(confirmSpy).toHaveBeenCalledWith(UNSAVED_WRITING_WARNING);
     expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it('a sign-out still waiting when the user opens another book saves nothing under the first', async () => {
+    const view = await openedAndTyped('First');
+    let finishFirst: (value: unknown) => void = () => {};
+    mockedClient.saveBookSummary.mockImplementationOnce(
+      () => new Promise((resolve) => (finishFirst = resolve)) as never
+    );
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+    let signedOut: Promise<boolean> = Promise.resolve(false);
+    await act(async () => {
+      signedOut = signOutOrNotify();
+    });
+
+    // Book 2 opens on the same page and gets an edit while the save runs.
+    mockBookId = 'book-2';
+    view.rerender(<BookSummaryPage />);
+    await waitFor(() => expect(mockedClient.getBookSummary).toHaveBeenCalledWith('book-2'));
+    await act(async () => {});
+    fireEvent.change(field(), { target: { value: 'B edited' } });
+    await act(async () => {
+      finishFirst({ summary: 'First', success: true });
+    });
+    await act(async () => {
+      await signedOut;
+    });
+
+    expect(mockedClient.saveBookSummary).not.toHaveBeenCalledWith('book-1', 'B edited');
+    view.unmount();
   });
 
   it('a leaving save waits behind a save still running, and sign-out waits for both', async () => {

@@ -83,6 +83,10 @@ export default function BookSummaryPage() {
   useEffect(() => {
     latestSummary.current = summary;
   }, [summary]);
+  const loadedRef = useRef(summaryLoaded);
+  useEffect(() => {
+    loadedRef.current = summaryLoaded;
+  }, [summaryLoaded]);
   const persist = useCallback((text: string) => {
     saveInFlight.current = true;
     // Resolves whether the text reached the server.
@@ -205,11 +209,15 @@ export default function BookSummaryPage() {
   // session can, and waits for a save in flight (#1091). The working copy is
   // removed by the sign-out, so a save that fails leaves the unsaved copy, which
   // sign-out asks about before removing it.
-  useEffect(
-    () =>
-      beforeSignOut(async () => {
+  useEffect(() => {
+    // Once this registration ends (another book, or the page closed), the refs
+    // below belong to whatever replaced it: a handler still awaiting stops,
+    // rather than save that text under this book. Leaving saves its own text.
+    let current = true;
+    const unregister = beforeSignOut(async () => {
         await savingRef.current;
-        if (!bookId || (!summaryLoaded && !userEditedRef.current)) return false;
+        if (!current) return false;
+        if (!bookId || (!loadedRef.current && !userEditedRef.current)) return false;
         if (saveTimeout.current) clearTimeout(saveTimeout.current);
         // Text typed while a save runs is saved too; text whose save failed is
         // not tried again here, but reported, so the user is asked about it even
@@ -220,11 +228,15 @@ export default function BookSummaryPage() {
           if (text === lastSaved.current || text === tried) break;
           tried = text;
           await persist(text);
+          if (!current) return false;
         }
         return latestSummary.current !== lastSaved.current;
-      }),
-    [bookId, summaryLoaded, persist]
-  );
+    });
+    return () => {
+      current = false;
+      unregister();
+    };
+  }, [bookId, persist]);
 
   // Leaving the page (or the book) inside the save delay saves the text rather
   // than dropping it (#1091): its only other copy is the working copy, which a

@@ -317,6 +317,7 @@ export function useChapterContent({
             if (!(await flush)) continue;
             // What markSaved records, since the user may still cancel the sign-out
             // and keep writing from here.
+            savedNow(`chapter:${edit.bookId}/${edit.chapterId}`);
             autoSaveFailuresRef.current = 0;
             setLastAutoSavedContent(edit.content);
             if (unsavedRef.current === edit) {

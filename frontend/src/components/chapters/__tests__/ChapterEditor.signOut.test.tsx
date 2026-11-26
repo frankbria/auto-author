@@ -156,6 +156,23 @@ describe('ChapterEditor: signing out from a book page (#1091)', () => {
     expect(localStorage.getItem(KEY)).toBeNull();
   });
 
+  it('after a failed leaving save, saving that chapter at sign-out asks nothing', async () => {
+    mockBookClient.saveChapterContent.mockRejectedValueOnce(SERVER_DOWN);
+    const first = await openWithUnsavedEdit();
+    first.unmount();
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    // Back to the chapter, the edit typed again; the backup offer is set aside.
+    localStorage.removeItem(KEY);
+    mockBookClient.saveChapterContent.mockResolvedValue({ last_modified: 'T2' } as SaveResult);
+    const view = await openWithUnsavedEdit();
+
+    expect(await signOutAndLeave(view)).toBe(true);
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+  });
+
   it('the autosave does not fire while the sign-out flush runs', async () => {
     let finishFlush: (value: SaveResult) => void = () => {};
     mockBookClient.saveChapterContent.mockImplementationOnce(
