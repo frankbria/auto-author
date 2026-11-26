@@ -18,6 +18,7 @@ from pymongo import AsyncMongoClient
 from app import main
 from app.db import base, questions
 from app.db.audit_log import ensure_audit_log_indexes
+from app.db.usage import ensure_usage_indexes
 from app.db.indexing_strategy import ChapterTabIndexManager
 from app.main import app
 from bson import ObjectId
@@ -31,6 +32,7 @@ async def _warm_collections():
     await base._db.books.insert_one({"warm": True})
     await base._db.chapter_access_logs.insert_one({"warm": True})
     await base._db.audit_logs.insert_one({"warm": True, "action": "warm"})
+    await base._db.usage_counters.insert_one({"warm": True})
 
 
 async def _index_map(collection):
@@ -153,6 +155,39 @@ async def test_lifespan_creates_audit_log_indexes(reinit_db):
     async with app.router.lifespan_context(app):
         await app.state.database_prepared
     _assert_audit_indexes(await _index_map(base._db.audit_logs))
+
+
+@pytest.mark.asyncio
+async def test_ensure_usage_indexes_indexes_user_id(reinit_db):
+    """Account deletion and the account export filter usage_counters on user_id
+    alone (#1318)."""
+    await _warm_collections()
+    await ensure_usage_indexes()
+    await ensure_usage_indexes()  # idempotent
+    assert (await _index_map(base._db.usage_counters))["usage_user_idx"]["key"] == {"user_id": 1}
+
+
+@pytest.mark.asyncio
+async def test_lifespan_creates_usage_indexes(reinit_db):
+    await _warm_collections()
+    async with app.router.lifespan_context(app):
+        await app.state.database_prepared
+    assert "usage_user_idx" in await _index_map(base._db.usage_counters)
+
+
+@pytest.mark.asyncio
+async def test_a_failed_usage_index_is_logged_and_not_fatal(reinit_db, monkeypatch, caplog):
+    from app.db import usage
+
+    async def broken(name):
+        class Coll:
+            async def create_index(self, *args, **kwargs):
+                raise RuntimeError("index build refused")
+        return Coll()
+
+    monkeypatch.setattr(usage, "get_collection", broken)
+    await ensure_usage_indexes()
+    assert "usage_counters" in caplog.text
 
 
 class TestStartingWhileTheDatabaseIsAway:

@@ -208,6 +208,7 @@ async def lifespan(app: FastAPI):
     from app.db.base import get_database
     from app.db.indexing_strategy import ChapterTabIndexManager
     from app.db.questions import ensure_question_indexes
+    from app.db.usage import ensure_usage_indexes
     from app.db.user import (
         ensure_user_indexes,
         grandfather_unverified_accounts,
@@ -260,6 +261,9 @@ async def lifespan(app: FastAPI):
 
         # audit_logs 90-day TTL, actor and target indexes, backfill of legacy rows (issue #787)
         await ensure_audit_log_indexes()
+
+        # usage_counters user_id index for deletion and the account export (#1318)
+        await ensure_usage_indexes()
 
         # Book owner_id indexes + chapter_access_logs indexes and 90-day TTL
         # (issue #183). Idempotent; per-index errors are logged, never fatal
