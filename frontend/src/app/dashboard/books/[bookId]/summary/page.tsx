@@ -101,8 +101,13 @@ export default function BookSummaryPage() {
     const saving = (earlier ? earlier.then(send) : send())
       .then((data) => {
         savedNow(`summary:${bookId}`);
-        // A save of another book says nothing about the one on screen.
-        if (shownBookRef.current !== bookId) return true;
+        // A save of another book says nothing about the one on screen, but a
+        // stored copy of this very text is redundant now: left, a sign-out
+        // would ask about writing that is saved.
+        if (shownBookRef.current !== bookId) {
+          if (readStored(unsavedKey(bookId)) === text) removeStored(unsavedKey(bookId));
+          return true;
+        }
         lastSaved.current = data.summary;
         if (!draftOnOffer.current) removeStored(unsavedKey(bookId));
         setSaveFailure(null);

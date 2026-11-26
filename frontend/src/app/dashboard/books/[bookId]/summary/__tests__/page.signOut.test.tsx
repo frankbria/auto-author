@@ -211,6 +211,35 @@ describe('BookSummaryPage: signing out (#1091)', () => {
     expect(confirmSpy).not.toHaveBeenCalled();
   });
 
+  it('a save that lands after the writer moved to another book removes its now redundant copy', async () => {
+    const view = await openedAndTyped('Saved at last');
+    // The first save fails and keeps a copy; the retry from leaving is slow.
+    mockedClient.saveBookSummary.mockRejectedValueOnce(new Error('Network error'));
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+    expect(localStorage.getItem(UNSAVED)).toBe('Saved at last');
+    let finishLeaving: (value: unknown) => void = () => {};
+    mockedClient.saveBookSummary.mockImplementationOnce(
+      () => new Promise((resolve) => (finishLeaving = resolve)) as never
+    );
+    mockBookId = 'book-2';
+    view.rerender(<BookSummaryPage />);
+    await waitFor(() => expect(mockedClient.getBookSummary).toHaveBeenCalledWith('book-2'));
+    await act(async () => {
+      finishLeaving({ summary: 'Saved at last', success: true });
+    });
+
+    expect(localStorage.getItem(UNSAVED)).toBeNull();
+    let signedOut = false;
+    await act(async () => {
+      signedOut = await signOutOrNotify();
+    });
+    expect(signedOut).toBe(true);
+    expect(confirmSpy).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
   it('a leaving save still queued is not sent after a newer save from the next visit', async () => {
     const view = await openedAndTyped('A');
     let finishA: (value: unknown) => void = () => {};
