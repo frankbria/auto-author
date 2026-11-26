@@ -101,7 +101,8 @@ main() {
   run tee "$target" < "$candidate" > /dev/null
 
   if ! run "$NGINX" -t 2>&1; then
-    run tee "$target" < "$backup" > /dev/null
+    # As root: cp -a kept the file's mode on the backup, which may not be readable to this account.
+    run cp "$backup" "$target"
     echo "::error::nginx -t failed with the change; the backup is back in place and nginx was not reloaded"
     return 1
   fi
