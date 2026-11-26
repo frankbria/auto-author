@@ -117,11 +117,21 @@ export async function signOutOrNotify({
   leavePage = false,
 } = {}): Promise<boolean> {
   await settleTrackedSaves();
-  const leftUnsaved = await Promise.all(
-    [...beforeSignOutHandlers].map((handler) => handler().then((unsaved) => unsaved === true, () => true))
-  );
-  // An editor closed while the handlers ran hands its edit to a leaving save.
-  await settleTrackedSaves();
+  // While the handlers wait on the network the user can still move: an editor
+  // closed meanwhile hands its edit to a leaving save, and one opened meanwhile
+  // registers a handler of its own. Both are covered before deciding; bounded,
+  // in case editors keep opening.
+  const ran = new Set<BeforeSignOut>();
+  const leftUnsaved: boolean[] = [];
+  for (let round = 0; round < 5; round++) {
+    const fresh = [...beforeSignOutHandlers].filter((handler) => !ran.has(handler));
+    if (fresh.length === 0) break;
+    fresh.forEach((handler) => ran.add(handler));
+    leftUnsaved.push(
+      ...(await Promise.all(fresh.map((handler) => handler().then((unsaved) => unsaved === true, () => true))))
+    );
+    await settleTrackedSaves();
+  }
   const unsaved = leftUnsaved.includes(true) || leftUnsavedOnLeaving.size > 0 || hasUnsavedLocalWriting();
   if (unsaved && !window.confirm(UNSAVED_WRITING_WARNING)) return false;
   underwayUntil = Infinity;

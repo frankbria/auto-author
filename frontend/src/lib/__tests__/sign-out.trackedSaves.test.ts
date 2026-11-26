@@ -48,6 +48,21 @@ describe('signOutOrNotify and tracked saves', () => {
     stop();
   });
 
+  it('also runs the handler of an editor opened while the handlers ran, and asks if it left text unsaved', async () => {
+    let stopLate: () => void = () => {};
+    const late = jest.fn(async () => true);
+    const stop = beforeSignOut(async () => {
+      stopLate = beforeSignOut(late);
+      return false;
+    });
+
+    expect(await signOutOrNotify()).toBe(false);
+    expect(late).toHaveBeenCalledTimes(1);
+    expect(confirmSpy).toHaveBeenCalledWith(UNSAVED_WRITING_WARNING);
+    stop();
+    stopLate();
+  });
+
   it('asks about a leaving save that failed before the sign-out began', async () => {
     await trackSave('summary:bk', Promise.resolve(false));
 
