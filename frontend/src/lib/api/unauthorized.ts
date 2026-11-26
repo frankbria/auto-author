@@ -49,11 +49,25 @@ async function handleTermsRefusal(response: Response): Promise<void> {
   if (reloading || typeof window === "undefined") return;
   const body = await response.json().catch(() => null);
   if (body?.detail?.error_code !== "TERMS_NOT_ACCEPTED") return;
-  const last = Number(sessionStorage.getItem(TERMS_RELOAD_KEY) ?? 0);
-  if (reloading || Date.now() - last < TERMS_RELOAD_PAUSE_MS) return;
+  if (reloading || Date.now() - lastTermsReload() < TERMS_RELOAD_PAUSE_MS) return;
   reloading = true;
-  sessionStorage.setItem(TERMS_RELOAD_KEY, String(Date.now()));
+  try {
+    sessionStorage.setItem(TERMS_RELOAD_KEY, String(Date.now()));
+  } catch {
+    // Storage blocked: lastTermsReload() falls back to the navigation type.
+  }
   browser.reload();
+}
+
+/** When this tab last reloaded for TERMS_NOT_ACCEPTED. With storage blocked,
+ * a page that was itself loaded by a reload counts as just reloaded. */
+function lastTermsReload(): number {
+  try {
+    return Number(sessionStorage.getItem(TERMS_RELOAD_KEY) ?? 0);
+  } catch {
+    const [entry] = performance.getEntriesByType?.("navigation") ?? [];
+    return (entry as PerformanceNavigationTiming | undefined)?.type === "reload" ? Date.now() : 0;
+  }
 }
 
 /**
