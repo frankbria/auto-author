@@ -318,7 +318,7 @@ async def test_a_webhook_clearing_the_stamp_mid_deletion_does_not_leave_rows_bar
     subscription, so the rows still end up dated from the cancel."""
     from datetime import datetime, timezone
 
-    import app.api.endpoints.billing as billing
+    import app.api.endpoints.billing_stripe as billing_stripe
     from app.db.audit_log import (
         RENEWAL_CONSENT_ACTION, renewal_consent_expiry, renewal_consent_live,
     )
@@ -329,13 +329,13 @@ async def test_a_webhook_clearing_the_stamp_mid_deletion_does_not_leave_rows_bar
     audit_logs = await get_collection("audit_logs")
     await audit_logs.insert_one({"action": RENEWAL_CONSENT_ACTION, "actor_id": OWNER,
                                  "timestamp": datetime(2026, 11, 1, tzinfo=timezone.utc)})
-    real_update = billing.update_user
+    real_update = billing_stripe.update_user
 
     async def webhook_lands_first(auth_id, *args, **kwargs):
         await renewal_consent_live(auth_id)
         return await real_update(auth_id, *args, **kwargs)
 
-    monkeypatch.setattr(billing, "update_user", webhook_lands_first)
+    monkeypatch.setattr(billing_stripe, "update_user", webhook_lands_first)
     assert (await client.delete("/api/v1/users/me")).status_code == 200
 
     row = await audit_logs.find_one({"actor_id": OWNER})

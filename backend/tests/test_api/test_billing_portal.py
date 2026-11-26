@@ -12,7 +12,7 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 import stripe
 
-from app.api.endpoints import billing
+from app.api.endpoints import billing_stripe
 
 from app.core.config import settings
 from tests.conftest import _sync_users
@@ -91,7 +91,7 @@ def portal_stub(monkeypatch):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     monkeypatch.setattr(stripe, "api_base", f"http://127.0.0.1:{server.server_port}")
     monkeypatch.setattr(stripe, "max_network_retries", 0)
-    monkeypatch.setattr(billing, "_portal_config_id", None)
+    monkeypatch.setattr(billing_stripe, "_portal_config_id", None)
     yield server
     server.shutdown()
     server.server_close()
@@ -215,7 +215,7 @@ async def test_portal_reuses_existing_configuration_across_processes(
     cold cache, nothing new is created; the cache then avoids even the lookup."""
     portal_stub.configs.append(
         {"id": "bpc_existing", "object": "billing_portal.configuration",
-         "active": True, "metadata": dict(billing.PORTAL_CONFIG_METADATA)}
+         "active": True, "metadata": dict(billing_stripe.PORTAL_CONFIG_METADATA)}
     )
     client = await auth_client_factory(
         overrides={"plan": "pro", "stripe_customer_id": "cus_paid_001"}
@@ -245,7 +245,7 @@ def test_concurrent_cold_start_creates_the_configuration_once(portal_stub, monke
 
     monkeypatch.setattr(stripe.billing_portal.Configuration, "create", slow_create)
     with ThreadPoolExecutor(max_workers=4) as pool:
-        ids = list(pool.map(lambda _: billing._get_or_create_portal_config("sk_test_x"), range(4)))
+        ids = list(pool.map(lambda _: billing_stripe._get_or_create_portal_config("sk_test_x"), range(4)))
 
     posts = [c for c in portal_stub.calls if c["method"] == "POST"
              and c["path"].endswith("/configurations")]
