@@ -170,4 +170,32 @@ describe('BookSummaryPage: signing out (#1091)', () => {
     expect(localStorage.getItem(UNSAVED)).toBeNull();
     expect(localStorage.getItem(WORKING)).toBeNull();
   });
+  it('while the page is still up after the sign-out, nothing it does writes the text back', async () => {
+    mockedClient.saveBookSummary.mockRejectedValue(new Error('Network error'));
+    render(<BookSummaryPage />);
+    await waitFor(() => expect(mockedClient.getBookSummary).toHaveBeenCalled());
+    await act(async () => {});
+    fireEvent.change(field(), { target: { value: 'Never reached the server' } });
+
+    let signedOut = false;
+    await act(async () => {
+      signedOut = await signOutOrNotify();
+    });
+    expect(signedOut).toBe(true);
+    expect(localStorage.getItem(UNSAVED)).toBeNull();
+
+    // The caller's navigation has not landed yet: a keystroke (or a dictation
+    // result), its debounced save, and the browser coming back online.
+    fireEvent.change(field(), { target: { value: 'Typed after signing out' } });
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+    });
+    await act(async () => {});
+
+    expect(localStorage.getItem(WORKING)).toBeNull();
+    expect(localStorage.getItem(UNSAVED)).toBeNull();
+  });
 });

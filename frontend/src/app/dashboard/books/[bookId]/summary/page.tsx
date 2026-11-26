@@ -73,10 +73,13 @@ export default function BookSummaryPage() {
   }, [bookId]);
   const saveInFlight = useRef(false);
   const savingRef = useRef<Promise<void> | null>(null);
+  // The sign-out count this page opened in (#1091). Once the user has signed
+  // out, the page may stay up until the next one replaces it; nothing it does
+  // meanwhile (a keystroke, a dictation result, a retry, a late failure) writes
+  // their text back to the browser the sign-out cleared.
+  const openedIn = useRef(signOutCount());
   const persist = useCallback((text: string) => {
     saveInFlight.current = true;
-    // A save that fails after the user signed out keeps nothing (#1091).
-    const startedIn = signOutCount();
     const saving = bookClient.saveBookSummary(bookId, text)
       .then((data) => {
         // A save of another book says nothing about the one on screen.
@@ -86,7 +89,7 @@ export default function BookSummaryPage() {
         setSaveFailure(null);
       })
       .catch(() => {
-        if (signOutCount() !== startedIn) return;
+        if (signOutCount() !== openedIn.current) return;
         // The text exists only here now. It is kept under its own key, which the
         // next load does not write over, and the writer is told (#832). Kept for
         // its own book whichever book is on screen; told only if it is this one.
@@ -173,7 +176,7 @@ export default function BookSummaryPage() {
   // edit made during the load is saved at once, or a refresh mid-load loses it
   // (#718).
   useEffect(() => {
-    if (!bookId || (!summaryLoaded && !userEditedRef.current)) return;
+    if (!bookId || (!summaryLoaded && !userEditedRef.current) || signOutCount() !== openedIn.current) return;
     // Save to localStorage. A browser that is full, or set to keep nothing,
     // throws here; the save to the server below still has to happen.
     writeStored(`book-summary-${bookId}`, summary);
@@ -207,7 +210,7 @@ export default function BookSummaryPage() {
   // A failed save is tried again by Try again and by the browser coming back
   // online, not only by a change to the text (#1047). Never over a save in flight.
   const retrySave = () => {
-    if (!saveInFlight.current) persist(summary);
+    if (!saveInFlight.current && signOutCount() === openedIn.current) persist(summary);
   };
   useEffect(() => {
     if (!saveFailure) return;
