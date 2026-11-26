@@ -8,6 +8,7 @@ import bookClient, { type ChapterSaveConflict } from '@/lib/api/bookClient';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
 import { AUTO_SAVE_DEFAULT_SECONDS, isValidAutoSaveInterval } from '@/lib/constants/auto-save';
+import { beforeSignOut, savedNow, signOutCount, trackSave } from '@/lib/sign-out';
 import {
   validateChapterBackup,
   getValidatedItem,
@@ -123,8 +124,11 @@ export function useChapterContent({
     return 0;
   });
   const noteBackupWrite = () => setBackupWrites((n) => n + 1);
+  // The sign-out count this editor opened in. Once the user signs out, nothing
+  // this editor still has running writes their text back to the browser (#1091).
+  const sessionRef = useRef(signOutCount());
   const backUp = (edit: { bookId: string; chapterId: string; content: string }, err: unknown) => {
-    const stored = backupChapterContent(edit, err);
+    const stored = backupChapterContent(edit, err, sessionRef.current);
     if (stored) ownBackups.current.add(chapterBackupKey(edit.bookId, edit.chapterId));
     return stored;
   };
@@ -279,11 +283,57 @@ export function useChapterContent({
       // A bfcache restore must not fire the pre-hide timer: its token is stale.
       clearTimeout(autoSaveTimerRef.current);
       setAutoSavePending(false); // so the first edit after a restore re-arms it
-      if (edit) void flushChapterContentOnPageHide(edit, seenRef.current, inFlightSaveRef.current);
+      if (edit) {
+        void flushChapterContentOnPageHide(edit, seenRef.current, inFlightSaveRef.current, sessionRef.current);
+      }
     };
     window.addEventListener('pagehide', flushOnPageHide);
     return () => window.removeEventListener('pagehide', flushOnPageHide);
   }, []);
+
+  // An explicit sign-out saves the edit still inside the autosave delay first,
+  // while the session can save it (#1091), and then any edit typed while that
+  // save ran. Whatever is still unsaved after that is reported, and sign-out asks
+  // about it before removing it, even where no backup could be stored.
+  useEffect(
+    () =>
+      beforeSignOut(async () => {
+        // A save in flight settles first, so a failure is backed up and asked about.
+        await inFlightSaveRef.current?.catch(() => {});
+        // The autosave must not fire while these flushes run: it would resend the
+        // same edit on the same token, and the second to land is answered 409.
+        // isSaving keeps it from re-arming; a leaving save waits on inFlightSaveRef.
+        clearTimeout(autoSaveTimerRef.current);
+        setIsSaving(true);
+        let tried: PendingChapterEdit | null = null;
+        try {
+          for (let round = 0; round < 3; round++) {
+            const edit = unsavedRef.current;
+            // Nothing pending, or this edit already failed: stop and report it.
+            if (!edit || edit === tried) break;
+            tried = edit;
+            const flush = flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
+            inFlightSaveRef.current = flush;
+            if ((await flush) !== 'saved') continue;
+            // What markSaved records, since the user may still cancel the sign-out
+            // and keep writing from here.
+            savedNow(`chapter:${edit.bookId}/${edit.chapterId}`);
+            autoSaveFailuresRef.current = 0;
+            setLastAutoSavedContent(edit.content);
+            if (unsavedRef.current === edit) {
+              unsavedRef.current = null;
+              setAutoSavePending(false);
+              setHasUnsavedChanges(false);
+            }
+          }
+        } finally {
+          setIsSaving(false);
+        }
+        setBackupWrites((n) => n + 1);
+        return unsavedRef.current !== null;
+      }),
+    []
+  );
 
   // Leaving a chapter, by unmount (TabContent keys the editor per chapter) or a
   // caller swapping chapterId, must not drop an edit still inside the autosave
@@ -293,7 +343,15 @@ export function useChapterContent({
       const edit = unsavedRef.current;
       unsavedRef.current = null;
       autoSaveFailuresRef.current = 0;
-      if (edit) void flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
+      if (edit) {
+        void trackSave(
+          `chapter:${bookId}/${chapterId}`,
+          flushChapterContent(edit, seenRef.current, inFlightSaveRef.current, sessionRef.current).then(
+            (outcome) => outcome !== 'lost'
+          ),
+          sessionRef.current
+        );
+      }
     },
     [bookId, chapterId]
   );
@@ -318,6 +376,7 @@ export function useChapterContent({
   // autosave effect re-arms for it because lastAutoSavedContent changed (#757).
   const markSaved = (content: string) => {
     saveSucceeded();
+    savedNow(`chapter:${bookId}/${chapterId}`);
     autoSaveFailuresRef.current = 0;
     setLastAutoSavedContent(content);
     if (editor?.getHTML() !== content) return;

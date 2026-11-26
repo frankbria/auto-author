@@ -18,10 +18,17 @@ import {
 import { useSpeechRecognitionSupported } from '@/lib/voice/useSpeechRecognitionSupported';
 import { SummarySaveNotices } from '@/components/books/SummarySaveNotices';
 import { readStored, removeStored, writeStored } from '@/lib/storage/safeLocalStorage';
+import { beforeSignOut, savedNow, signOutCount, trackSave } from '@/lib/sign-out';
 
 // Where a summary whose save failed is kept (#832): apart from the working copy,
 // which every load and every keystroke writes over.
 const unsavedKey = (bookId: string) => `book-summary-unsaved-${bookId}`;
+
+// The latest summary save of each book, across visits (#1091). The server keeps
+// whichever save lands last, with no version check, so every save of a book
+// goes out after the one before it: a page's leaving save cannot land after a
+// newer save from the next visit to the same book.
+const summarySaves = new Map<string, Promise<boolean>>();
 
 export default function BookSummaryPage() {
   const router = useRouter();
@@ -71,26 +78,57 @@ export default function BookSummaryPage() {
     shownBookRef.current = bookId;
   }, [bookId]);
   const saveInFlight = useRef(false);
+  const savingRef = useRef<Promise<boolean> | null>(null);
+  // The sign-out count this page opened in (#1091). Once the user has signed
+  // out, the page may stay up until the next one replaces it; nothing it does
+  // meanwhile (a keystroke, a dictation result, a retry, a late failure) writes
+  // their text back to the browser the sign-out cleared.
+  const openedIn = useRef(signOutCount());
+  // The text in the field now, for a sign-out that waits on a save (#1091).
+  const latestSummary = useRef(summary);
+  useEffect(() => {
+    latestSummary.current = summary;
+  }, [summary]);
+  const loadedRef = useRef(summaryLoaded);
+  useEffect(() => {
+    loadedRef.current = summaryLoaded;
+  }, [summaryLoaded]);
   const persist = useCallback((text: string) => {
     saveInFlight.current = true;
-    bookClient.saveBookSummary(bookId, text)
+    // Resolves whether the text is safe: on the server, or kept in this browser.
+    const send = () => bookClient.saveBookSummary(bookId, text);
+    const earlier = summarySaves.get(bookId);
+    const saving = (earlier ? earlier.then(send) : send())
       .then((data) => {
-        // A save of another book says nothing about the one on screen.
-        if (shownBookRef.current !== bookId) return;
+        savedNow(`summary:${bookId}`);
+        // A save of another book says nothing about the one on screen, but a
+        // stored copy of this very text is redundant now: left, a sign-out
+        // would ask about writing that is saved.
+        if (shownBookRef.current !== bookId) {
+          if (readStored(unsavedKey(bookId)) === text) removeStored(unsavedKey(bookId));
+          return true;
+        }
         lastSaved.current = data.summary;
         if (!draftOnOffer.current) removeStored(unsavedKey(bookId));
         setSaveFailure(null);
+        return true;
       })
       .catch(() => {
+        if (signOutCount() !== openedIn.current) return false;
         // The text exists only here now. It is kept under its own key, which the
         // next load does not write over, and the writer is told (#832). Kept for
         // its own book whichever book is on screen; told only if it is this one.
         const kept = writeStored(unsavedKey(bookId), text);
         if (shownBookRef.current === bookId) setSaveFailure({ kept });
+        return kept;
       })
       .finally(() => {
         saveInFlight.current = false;
+        if (summarySaves.get(bookId) === saving) summarySaves.delete(bookId);
       });
+    summarySaves.set(bookId, saving);
+    savingRef.current = saving;
+    return saving;
   }, [bookId]);
   const [summaryHistory, setSummaryHistory] = useState<unknown[]>([]);
   // Derived during render, not mirrored into state via an effect (#584,
@@ -166,7 +204,7 @@ export default function BookSummaryPage() {
   // edit made during the load is saved at once, or a refresh mid-load loses it
   // (#718).
   useEffect(() => {
-    if (!bookId || (!summaryLoaded && !userEditedRef.current)) return;
+    if (!bookId || (!summaryLoaded && !userEditedRef.current) || signOutCount() !== openedIn.current) return;
     // Save to localStorage. A browser that is full, or set to keep nothing,
     // throws here; the save to the server below still has to happen.
     writeStored(`book-summary-${bookId}`, summary);
@@ -182,10 +220,59 @@ export default function BookSummaryPage() {
     };
   }, [summary, bookId, summaryLoaded, persist]);
 
+  // An explicit sign-out saves the text still inside the delay above, while the
+  // session can, and waits for a save in flight (#1091). The working copy is
+  // removed by the sign-out, so a save that fails leaves the unsaved copy, which
+  // sign-out asks about before removing it.
+  useEffect(() => {
+    // Once this registration ends (another book, or the page closed), the refs
+    // below belong to whatever replaced it: a handler still awaiting stops,
+    // rather than save that text under this book. Leaving saves its own text.
+    let current = true;
+    const unregister = beforeSignOut(async () => {
+        await savingRef.current;
+        if (!current) return false;
+        if (!bookId || (!loadedRef.current && !userEditedRef.current)) return false;
+        if (saveTimeout.current) clearTimeout(saveTimeout.current);
+        // Text typed while a save runs is saved too; text whose save failed is
+        // not tried again here, but reported, so the user is asked about it even
+        // if the browser could not keep a copy.
+        let tried: string | null = null;
+        for (let round = 0; round < 3; round++) {
+          const text = latestSummary.current;
+          if (text === lastSaved.current || text === tried) break;
+          tried = text;
+          await persist(text);
+          if (!current) return false;
+        }
+        return latestSummary.current !== lastSaved.current;
+    });
+    return () => {
+      current = false;
+      unregister();
+    };
+  }, [bookId, persist]);
+
+  // Leaving the page (or the book) inside the save delay saves the text rather
+  // than dropping it (#1091): its only other copy is the working copy, which a
+  // sign-out removes. The sign-out waits for this save; a failure keeps the
+  // unsaved copy, which it asks about.
+  useEffect(
+    () => () => {
+      const text = latestSummary.current;
+      // Only what the writer typed on this visit; the loaded text is not theirs to resend.
+      if (!bookId || !userEditedRef.current || text === lastSaved.current) return;
+      if (signOutCount() !== openedIn.current) return;
+      // persist() sends it after any save of this book still running.
+      void trackSave(`summary:${bookId}`, persist(text), openedIn.current);
+    },
+    [bookId, persist]
+  );
+
   // A failed save is tried again by Try again and by the browser coming back
   // online, not only by a change to the text (#1047). Never over a save in flight.
   const retrySave = () => {
-    if (!saveInFlight.current) persist(summary);
+    if (!saveInFlight.current && signOutCount() === openedIn.current) persist(summary);
   };
   useEffect(() => {
     if (!saveFailure) return;
