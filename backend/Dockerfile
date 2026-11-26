@@ -18,8 +18,10 @@ FROM python:3.13-slim@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637e
 # CVE-2026-85091) is newer than every python:3.13-slim on Docker Hub, the
 # 2026-11-08 rebuild included, so the image scan fails on the base layer alone.
 # Upgrade just that package until a base digest carries it; then delete this.
+# libzstd1 likewise (1.5.7+dfsg-1+deb13u1, CVE-2026-124851, #1311): the
+# 2026-11-24 python:3.13-slim still ships 1.5.7+dfsg-1.
 RUN apt-get update \
-    && apt-get install --yes --only-upgrade --no-install-recommends zlib1g \
+    && apt-get install --yes --only-upgrade --no-install-recommends zlib1g libzstd1 \
     && rm -rf /var/lib/apt/lists/*
 
 # uv, by version and digest (#819). `:latest` was whatever was newest on the day
