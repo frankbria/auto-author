@@ -271,7 +271,13 @@ export async function openSeededChapter(
     title: `Test Book ${Date.now()}`,
   });
   const chapterId = chapters[0].id;
-  await page.goto(`/dashboard/books/${book.id}?chapter=${chapterId}`);
-  await expect(page.locator('.tiptap')).toBeVisible();
+  try {
+    await page.goto(`/dashboard/books/${book.id}?chapter=${chapterId}`);
+    await expect(page.locator('.tiptap')).toBeVisible();
+  } catch (error) {
+    // The caller never learns the id on failure, so its afterEach can't clean up.
+    await deleteTestBook(page, book.id);
+    throw error;
+  }
   return { bookId: book.id, chapterId };
 }
