@@ -5,7 +5,7 @@
  * All functions work in auth bypass mode without requiring Clerk authentication.
  */
 
-import { Page } from '@playwright/test';
+import { Page, expect } from '@playwright/test';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -257,4 +257,28 @@ export async function getAllBooks(page: Page): Promise<TestBook[]> {
     console.warn('Failed to fetch books:', error);
     return [];
   }
+}
+
+/**
+ * Seed a book with a TOC and open its first chapter on the book page
+ * (`?chapter=`), waiting for the editor to mount (#1094). Register any
+ * page.route() mocks first: they must be in place before the page loads.
+ */
+export async function openSeededChapter(
+  page: Page
+): Promise<{ bookId: string; chapterId: string }> {
+  const { book, chapters } = await createTestBookWithTOC(page, {
+    title: `Test Book ${Date.now()}`,
+  });
+  let chapterId: string;
+  try {
+    chapterId = chapters[0].id;
+    await page.goto(`/dashboard/books/${book.id}?chapter=${chapterId}`);
+    await expect(page.locator('.tiptap')).toBeVisible();
+  } catch (error) {
+    // The caller never learns the id on failure, so its afterEach can't clean up.
+    await deleteTestBook(page, book.id);
+    throw error;
+  }
+  return { bookId: book.id, chapterId };
 }

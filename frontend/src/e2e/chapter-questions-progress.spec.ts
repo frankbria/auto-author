@@ -8,11 +8,18 @@
  *
  * Deterministic: the chapter content, questions list and progress summary are
  * mocked via page.route(); no real backend / OpenAI. Runs with BYPASS_AUTH=true.
- * Mirrors the #57 content-enhancement spec (cancel only the editor's 2s
- * auto-redirect timer so the editor stays mounted).
+ * The book is seeded through the API and opened on the book page (#1094).
  */
 
 import { test, expect } from '@playwright/test';
+import { deleteTestBook, openSeededChapter } from './helpers/testData';
+
+let bookId: string | undefined;
+
+test.afterEach(async ({ page }) => {
+  if (bookId) await deleteTestBook(page, bookId);
+  bookId = undefined;
+});
 
 const BOOK_ID = 'e2e-progress-book';
 const CHAPTER_ID = 'e2e-progress-chapter';
@@ -33,13 +40,6 @@ function question(id: string, order: number, text: string, status?: 'completed' 
 }
 
 async function mockEditor(page: import('@playwright/test').Page) {
-  await page.addInitScript(() => {
-    const original = window.setTimeout.bind(window);
-    // @ts-expect-error - test shim narrows the overload deliberately
-    window.setTimeout = (handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
-      timeout === 2000 ? 0 : original(handler, timeout as number, ...args);
-  });
-
   await page.route('**/books/*/chapters/*/content*', (route) =>
     route.fulfill({
       status: 200,
@@ -80,7 +80,7 @@ test.describe('Chapter question progress tracking (issue #53)', () => {
       })
     );
 
-    await page.goto(`/dashboard/books/${BOOK_ID}/chapters/${CHAPTER_ID}`);
+    ({ bookId } = await openSeededChapter(page));
     await page.getByRole('tab', { name: /Interview Questions/i }).click();
 
     // Progress summary + bar reflect real data.
@@ -119,7 +119,7 @@ test.describe('Chapter question progress tracking (issue #53)', () => {
       })
     );
 
-    await page.goto(`/dashboard/books/${BOOK_ID}/chapters/${CHAPTER_ID}`);
+    ({ bookId } = await openSeededChapter(page));
     await page.getByRole('tab', { name: /Interview Questions/i }).click();
 
     await expect(page.getByText('All questions completed')).toBeVisible();

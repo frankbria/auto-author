@@ -9,11 +9,19 @@
  * call are mocked via page.route(), so no real backend / OpenAI is needed.
  * Runs with BYPASS_AUTH=true (see playwright.config.ts).
  *
- * The legacy editor route auto-redirects to the tabbed interface after 2s; we
- * cancel only that one timer via an init script so the dialog stays mounted.
+ * The book and its chapter are seeded through the API and opened on the book
+ * page (#1094); the AI calls and chapter content stay mocked.
  */
 
 import { test, expect } from '@playwright/test';
+import { deleteTestBook, openSeededChapter } from './helpers/testData';
+
+let bookId: string | undefined;
+
+test.afterEach(async ({ page }) => {
+  if (bookId) await deleteTestBook(page, bookId);
+  bookId = undefined;
+});
 
 const BOOK_ID = 'e2e-draft-book';
 const CHAPTER_ID = 'e2e-draft-chapter';
@@ -21,16 +29,6 @@ const DRAFT_HTML = '<p>This is the AI-generated chapter draft about resilience.<
 
 test.describe('AI draft generation (issue #55)', () => {
   test('generates a draft from answers and inserts it into the editor', async ({ page }) => {
-    // Cancel the legacy page's 2s redirect-to-tabs timer (test-only; the draft
-    // feature itself is unaffected). TipTap autosave uses a 3s debounce, so this
-    // 2000ms-scoped shim does not touch editor behaviour.
-    await page.addInitScript(() => {
-      const original = window.setTimeout.bind(window);
-      // @ts-expect-error - test shim narrows the overload deliberately
-      window.setTimeout = (handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
-        timeout === 2000 ? 0 : original(handler, timeout as number, ...args);
-    });
-
     // Chapter content load → empty editor.
     await page.route('**/books/*/chapters/*/content*', (route) =>
       route.fulfill({
@@ -75,7 +73,7 @@ test.describe('AI draft generation (issue #55)', () => {
       })
     );
 
-    await page.goto(`/dashboard/books/${BOOK_ID}/chapters/${CHAPTER_ID}`);
+    ({ bookId } = await openSeededChapter(page));
 
     // Editor toolbar exposes the draft entry point once the editor mounts.
     const openButton = page.getByRole('button', { name: /generate ai draft/i });
