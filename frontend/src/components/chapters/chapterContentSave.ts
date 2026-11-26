@@ -71,7 +71,7 @@ export function flushChapterContentOnPageHide(
   seen: SeenChapters,
   inFlightSave: Promise<unknown> | null,
   startedIn: number = signOutCount()
-): Promise<boolean> {
+): Promise<FlushOutcome> {
   backupChapterContent(edit, new Error('Not saved yet: the page was closed'), startedIn);
   return flushChapterContent(edit, seen, inFlightSave, startedIn);
 }
@@ -158,26 +158,28 @@ export function backupChapterContent(
  * An editor that outlived a sign-out (#1091) has nothing to save: the user
  * already chose what happens to its text, and there is no session to save with.
  */
+/** Saved; not saved but backed up in this browser; or not saved and not kept anywhere. */
+export type FlushOutcome = 'saved' | 'kept' | 'lost';
+
 export async function flushChapterContent(
   edit: PendingChapterEdit,
   seen: SeenChapters,
   inFlightSave: Promise<unknown> | null = null,
   startedIn: number = signOutCount()
-): Promise<boolean> {
-  if (signOutCount() !== startedIn) return false;
+): Promise<FlushOutcome> {
+  if (signOutCount() !== startedIn) return 'lost';
   await inFlightSave?.catch(() => {});
   try {
     // A conflict lands in the backup too: leaving never overwrites the other copy.
     await saveChapterEdit(edit, seen, { keepalive: true });
     saveSucceeded();
     localStorage.removeItem(chapterBackupKey(edit.bookId, edit.chapterId));
-    return true;
+    return 'saved';
   } catch (err) {
     console.error('Failed to save chapter content on leaving it:', err);
     // A conflict is an answer, not a failure: the other copy stands and this one is kept.
     if (!isChapterConflict(err)) reportSaveFailure('leave-save', err);
-    backupChapterContent(edit, err, startedIn);
-    return false;
+    return backupChapterContent(edit, err, startedIn) ? 'kept' : 'lost';
   }
 }
 

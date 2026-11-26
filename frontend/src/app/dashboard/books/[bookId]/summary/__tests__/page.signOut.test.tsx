@@ -193,6 +193,54 @@ describe('BookSummaryPage: signing out (#1091)', () => {
     view.unmount();
   });
 
+  it('a failed leaving save whose kept copy was then discarded is not asked about', async () => {
+    mockedClient.saveBookSummary.mockRejectedValueOnce(new Error('Network error'));
+    const view = await openedAndTyped('Typed, then left');
+    view.unmount();
+    await act(async () => {});
+    expect(localStorage.getItem(UNSAVED)).toBe('Typed, then left');
+    // The writer comes back and discards the offered draft.
+    localStorage.removeItem(UNSAVED);
+
+    let signedOut = false;
+    await act(async () => {
+      signedOut = await signOutOrNotify();
+    });
+
+    expect(signedOut).toBe(true);
+    expect(confirmSpy).not.toHaveBeenCalled();
+  });
+
+  it('a leaving save still queued is not sent after a newer save from the next visit', async () => {
+    const view = await openedAndTyped('A');
+    let finishA: (value: unknown) => void = () => {};
+    mockedClient.saveBookSummary.mockImplementationOnce(
+      () => new Promise((resolve) => (finishA = resolve)) as never
+    );
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+    // B is typed and the page closes while A's save runs: B queues behind A.
+    fireEvent.change(field(), { target: { value: 'B' } });
+    view.unmount();
+
+    // Back on the same book: C is typed and its save comes due.
+    const again = await openedAndTyped('C');
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+    await act(async () => {
+      finishA({ summary: 'A', success: true });
+    });
+    await act(async () => {});
+    await act(async () => {});
+
+    const sent = mockedClient.saveBookSummary.mock.calls.map(([, text]) => text);
+    expect(sent.indexOf('B')).toBeLessThan(sent.lastIndexOf('C'));
+    expect(sent[sent.length - 1]).toBe('C');
+    again.unmount();
+  });
+
   it('a leaving save waits behind a save still running, and sign-out waits for both', async () => {
     const view = await openedAndTyped('First');
     let finishFirst: (value: unknown) => void = () => {};

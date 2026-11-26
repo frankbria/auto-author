@@ -50,25 +50,26 @@ export function beforeSignOut(handler: BeforeSignOut): () => void {
 }
 
 const pendingSaves = new Set<Promise<unknown>>();
-// What a failed leaving save left unsaved, by key: kept here as well as in the
-// browser's backup, since storing that backup can itself fail (full storage).
+// Text a failed leaving save could not keep anywhere (its backup could not be
+// stored either: full or blocked storage), by key. A backup that was stored is
+// seen by hasUnsavedLocalWriting(), and goes when it is discarded or restored.
 const leftUnsavedOnLeaving = new Set<string>();
 
 /**
  * A save from a page or editor that is already gone (its leaving flush, #1091),
- * resolving whether its text reached the server. No beforeSignOut handler
- * covers it any more, so a sign-out waits for it before deciding, and asks if
- * it failed, even when no backup could be stored. `key` names the text (one
- * chapter, one summary), so a later save of it clears the mark (savedNow).
+ * resolving whether its text is safe: saved, or kept as a backup in this
+ * browser. No beforeSignOut handler covers it any more, so a sign-out waits for
+ * it before deciding, and asks about text that was neither. `key` names the
+ * text (one chapter, one summary), so a later save of it clears the mark (savedNow).
  * `startedIn`: the signOutCount() its editor opened in; a save from an editor
  * that outlived a sign-out marks nothing.
  */
 export function trackSave(key: string, save: Promise<boolean>, startedIn = signOutCount()): Promise<boolean> {
   pendingSaves.add(save);
-  const settled = (saved: boolean) => {
+  const settled = (safe: boolean) => {
     pendingSaves.delete(save);
     if (signOuts !== startedIn) return;
-    if (saved) leftUnsavedOnLeaving.delete(key);
+    if (safe) leftUnsavedOnLeaving.delete(key);
     else leftUnsavedOnLeaving.add(key);
   };
   save.then(settled, () => settled(false));
@@ -80,7 +81,7 @@ export function resetLeavingSavesForTests() {
   leftUnsavedOnLeaving.clear();
 }
 
-/** The text under `key` has reached the server since a leaving save failed. */
+/** The text under `key` has reached the server since a leaving save lost it. */
 export function savedNow(key: string) {
   leftUnsavedOnLeaving.delete(key);
 }

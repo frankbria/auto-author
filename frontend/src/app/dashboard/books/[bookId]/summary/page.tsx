@@ -24,6 +24,12 @@ import { beforeSignOut, savedNow, signOutCount, trackSave } from '@/lib/sign-out
 // which every load and every keystroke writes over.
 const unsavedKey = (bookId: string) => `book-summary-unsaved-${bookId}`;
 
+// The latest summary save of each book, across visits (#1091). The server keeps
+// whichever save lands last, with no version check, so every save of a book
+// goes out after the one before it: a page's leaving save cannot land after a
+// newer save from the next visit to the same book.
+const summarySaves = new Map<string, Promise<boolean>>();
+
 export default function BookSummaryPage() {
   const router = useRouter();
   const params = useParams();
@@ -89,8 +95,10 @@ export default function BookSummaryPage() {
   }, [summaryLoaded]);
   const persist = useCallback((text: string) => {
     saveInFlight.current = true;
-    // Resolves whether the text reached the server.
-    const saving = bookClient.saveBookSummary(bookId, text)
+    // Resolves whether the text is safe: on the server, or kept in this browser.
+    const send = () => bookClient.saveBookSummary(bookId, text);
+    const earlier = summarySaves.get(bookId);
+    const saving = (earlier ? earlier.then(send) : send())
       .then((data) => {
         savedNow(`summary:${bookId}`);
         // A save of another book says nothing about the one on screen.
@@ -107,11 +115,13 @@ export default function BookSummaryPage() {
         // its own book whichever book is on screen; told only if it is this one.
         const kept = writeStored(unsavedKey(bookId), text);
         if (shownBookRef.current === bookId) setSaveFailure({ kept });
-        return false;
+        return kept;
       })
       .finally(() => {
         saveInFlight.current = false;
+        if (summarySaves.get(bookId) === saving) summarySaves.delete(bookId);
       });
+    summarySaves.set(bookId, saving);
     savingRef.current = saving;
     return saving;
   }, [bookId]);
@@ -248,9 +258,8 @@ export default function BookSummaryPage() {
       // Only what the writer typed on this visit; the loaded text is not theirs to resend.
       if (!bookId || !userEditedRef.current || text === lastSaved.current) return;
       if (signOutCount() !== openedIn.current) return;
-      // Behind a save still running, since the server keeps whichever lands last.
-      const earlier = saveInFlight.current ? savingRef.current : null;
-      void trackSave(`summary:${bookId}`, earlier ? earlier.then(() => persist(text)) : persist(text), openedIn.current);
+      // persist() sends it after any save of this book still running.
+      void trackSave(`summary:${bookId}`, persist(text), openedIn.current);
     },
     [bookId, persist]
   );

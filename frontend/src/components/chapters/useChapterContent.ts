@@ -314,7 +314,7 @@ export function useChapterContent({
             tried = edit;
             const flush = flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
             inFlightSaveRef.current = flush;
-            if (!(await flush)) continue;
+            if ((await flush) !== 'saved') continue;
             // What markSaved records, since the user may still cancel the sign-out
             // and keep writing from here.
             savedNow(`chapter:${edit.bookId}/${edit.chapterId}`);
@@ -346,7 +346,9 @@ export function useChapterContent({
       if (edit) {
         void trackSave(
           `chapter:${bookId}/${chapterId}`,
-          flushChapterContent(edit, seenRef.current, inFlightSaveRef.current, sessionRef.current),
+          flushChapterContent(edit, seenRef.current, inFlightSaveRef.current, sessionRef.current).then(
+            (outcome) => outcome !== 'lost'
+          ),
           sessionRef.current
         );
       }
