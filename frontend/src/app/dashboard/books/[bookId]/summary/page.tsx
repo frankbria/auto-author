@@ -232,7 +232,9 @@ export default function BookSummaryPage() {
       // Only what the writer typed on this visit; the loaded text is not theirs to resend.
       if (!bookId || !userEditedRef.current || text === lastSaved.current) return;
       if (signOutCount() !== openedIn.current) return;
-      void trackSave(persist(text));
+      // Behind a save still running, since the server keeps whichever lands last.
+      const earlier = saveInFlight.current ? savingRef.current : null;
+      void trackSave(earlier ? earlier.then(() => persist(text)) : persist(text));
     },
     [bookId, persist]
   );

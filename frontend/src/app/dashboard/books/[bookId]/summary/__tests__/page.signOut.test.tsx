@@ -137,6 +137,40 @@ describe('BookSummaryPage: signing out (#1091)', () => {
     expect(localStorage.getItem(UNSAVED)).toBe('Typed, then left');
   });
 
+  it('a leaving save waits behind a save still running, and sign-out waits for both', async () => {
+    const view = await openedAndTyped('First');
+    let finishFirst: (value: unknown) => void = () => {};
+    mockedClient.saveBookSummary.mockImplementationOnce(
+      () => new Promise((resolve) => (finishFirst = resolve)) as never
+    );
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+    expect(mockedClient.saveBookSummary).toHaveBeenCalledTimes(1);
+
+    // More typing, then the page closes while the first save still runs.
+    fireEvent.change(field(), { target: { value: 'Second' } });
+    view.unmount();
+    await act(async () => {});
+    expect(mockedClient.saveBookSummary).toHaveBeenCalledTimes(1);
+
+    let signedOut: Promise<boolean> = Promise.resolve(false);
+    await act(async () => {
+      signedOut = signOutOrNotify();
+    });
+    expect(mockSignOut).not.toHaveBeenCalled();
+    await act(async () => {
+      finishFirst({ summary: 'First', success: true });
+    });
+
+    expect(await signedOut).toBe(true);
+    expect(mockedClient.saveBookSummary).toHaveBeenLastCalledWith('book-1', 'Second');
+    expect(mockedClient.saveBookSummary.mock.invocationCallOrder[1]).toBeLessThan(
+      mockSignOut.mock.invocationCallOrder[0]
+    );
+    expect(confirmSpy).not.toHaveBeenCalled();
+  });
+
   it('waits for a save in flight, and a save that fails after the sign-out writes nothing back', async () => {
     const view = await openedAndTyped('First');
     // The debounced save starts and is still running when the user signs out.

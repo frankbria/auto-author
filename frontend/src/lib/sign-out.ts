@@ -65,6 +65,13 @@ export function trackSave<T>(save: Promise<T>): Promise<T> {
   return save;
 }
 
+/** Waits until no tracked save is running, including ones started meanwhile. */
+async function settleTrackedSaves() {
+  while (pendingSaves.size > 0) {
+    await Promise.all([...pendingSaves].map((save) => save.catch(() => {})));
+  }
+}
+
 export const UNSAVED_WRITING_WARNING =
   "Some of your writing could not be saved to your account and is only in this browser. " +
   "Signing out removes it from this browser. Sign out anyway?";
@@ -89,10 +96,12 @@ export async function signOutOrNotify({
   quiet = false,
   leavePage = false,
 } = {}): Promise<boolean> {
-  await Promise.all([...pendingSaves].map((save) => save.catch(() => {})));
+  await settleTrackedSaves();
   const leftUnsaved = await Promise.all(
     [...beforeSignOutHandlers].map((handler) => handler().then((unsaved) => unsaved === true, () => true))
   );
+  // An editor closed while the handlers ran hands its edit to a leaving save.
+  await settleTrackedSaves();
   const unsaved = leftUnsaved.includes(true) || hasUnsavedLocalWriting();
   if (unsaved && !window.confirm(UNSAVED_WRITING_WARNING)) return false;
   underwayUntil = Infinity;
