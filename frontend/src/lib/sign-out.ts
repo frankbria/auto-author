@@ -1,6 +1,7 @@
 import { authClient } from "@/lib/auth-client";
 import { toast } from "@/lib/toast";
 import { closeTermsExits } from "@/lib/terms-exits";
+import { clearLocalWriting, hasUnsavedLocalWriting } from "@/lib/storage/localWriting";
 
 // Until when a sign-out the user asked for owns the navigation: open-ended
 // while the request runs, then long enough for the caller's router.push.
@@ -19,11 +20,37 @@ export const endSignOut = () => {
   underwayUntil = 0;
 };
 
+type BeforeSignOut = () => Promise<unknown>;
+const beforeSignOutHandlers = new Set<BeforeSignOut>();
+
+/**
+ * Work an explicit sign-out waits for, while the session can still save (#1091):
+ * an open editor's edit still inside its autosave delay. Returns the
+ * unregister function, so it can be a React effect's cleanup.
+ */
+export function beforeSignOut(handler: BeforeSignOut): () => void {
+  beforeSignOutHandlers.add(handler);
+  return () => {
+    beforeSignOutHandlers.delete(handler);
+  };
+}
+
+export const UNSAVED_WRITING_WARNING =
+  "Some of your writing could not be saved to your account and is only in this browser. " +
+  "Signing out removes it from this browser. Sign out anyway?";
+
 /**
  * Signs the user out and says so when it fails (#796). The client resolves
  * with `{ error }` when refused and throws when the request never arrives;
  * either way the session is still alive, so the caller must not carry on as
  * if it had worked. Returns whether the sign-out happened.
+ *
+ * A sign-out removes the user's writing from this browser (#1091), so the next
+ * person at a shared device cannot read it. Edits still waiting to save are
+ * saved first; if any text still never reached the server, the user is asked
+ * before it is discarded, and a "no" leaves them signed in with it kept. The
+ * 401 path (`lib/api/unauthorized.ts`) never comes here: a session that
+ * expired mid-edit keeps its backups, since they may be the only copy.
  *
  * `leavePage`: hold the redirect guards until the page is replaced, for a
  * caller that follows a success with a full-page load rather than router.push.
@@ -32,6 +59,8 @@ export async function signOutOrNotify({
   quiet = false,
   leavePage = false,
 } = {}): Promise<boolean> {
+  await Promise.all([...beforeSignOutHandlers].map((handler) => handler().catch(() => {})));
+  if (hasUnsavedLocalWriting() && !window.confirm(UNSAVED_WRITING_WARNING)) return false;
   underwayUntil = Infinity;
   const failed = await authClient.signOut().then(
     ({ error }) => Boolean(error),
@@ -41,7 +70,10 @@ export async function signOutOrNotify({
   // no timer can expire before a slow navigation lands (#1177).
   underwayUntil = failed ? 0 : leavePage ? Infinity : Date.now() + CALLER_NAVIGATES_WITHIN_MS;
   // The next sign-in in this tab is asked about the Terms again (#961).
-  if (!failed) closeTermsExits();
+  if (!failed) {
+    closeTermsExits();
+    clearLocalWriting();
+  }
   if (failed && !quiet) {
     toast({
       title: "Could not sign out",

@@ -8,6 +8,7 @@ import bookClient, { type ChapterSaveConflict } from '@/lib/api/bookClient';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
 import { AUTO_SAVE_DEFAULT_SECONDS, isValidAutoSaveInterval } from '@/lib/constants/auto-save';
+import { beforeSignOut } from '@/lib/sign-out';
 import {
   validateChapterBackup,
   getValidatedItem,
@@ -284,6 +285,21 @@ export function useChapterContent({
     window.addEventListener('pagehide', flushOnPageHide);
     return () => window.removeEventListener('pagehide', flushOnPageHide);
   }, []);
+
+  // An explicit sign-out saves the edit still inside the autosave delay first,
+  // while the session can save it (#1091). A failed save leaves a backup, which
+  // sign-out asks about before removing it.
+  useEffect(
+    () =>
+      beforeSignOut(async () => {
+        const edit = unsavedRef.current;
+        if (!edit) return;
+        const saved = await flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
+        if (saved && unsavedRef.current === edit) unsavedRef.current = null;
+        setBackupWrites((n) => n + 1);
+      }),
+    []
+  );
 
   // Leaving a chapter, by unmount (TabContent keys the editor per chapter) or a
   // caller swapping chapterId, must not drop an edit still inside the autosave

@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import bookClient, { type ChapterSaveConflict } from '@/lib/api/bookClient';
+import { signOutUnderway } from '@/lib/sign-out';
 import {
   ChapterBackup,
   getValidatedItem,
@@ -69,7 +70,7 @@ export function flushChapterContentOnPageHide(
   edit: PendingChapterEdit,
   seen: SeenChapters,
   inFlightSave: Promise<unknown> | null
-): Promise<void> {
+): Promise<boolean> {
   backupChapterContent(edit, new Error('Not saved yet: the page was closed'));
   return flushChapterContent(edit, seen, inFlightSave);
 }
@@ -118,11 +119,19 @@ export function saveSucceeded(): void {
   lastReported.clear();
 }
 
-/** Keeps content that failed to save in localStorage. Returns whether it was stored. */
+/**
+ * Keeps content that failed to save in localStorage. Returns whether it was stored.
+ *
+ * Not once the user has chosen to sign out (#1091): sign-out removes their writing
+ * from this browser, and the editor it unmounts would otherwise save with no
+ * session and write a backup after the clear. Edits waiting to save were saved,
+ * or backed up and warned about, before the sign-out began.
+ */
 export function backupChapterContent(
   { bookId, chapterId, content }: PendingChapterEdit,
   err: unknown
 ): boolean {
+  if (signOutUnderway()) return false;
   const backup: ChapterBackup = {
     content,
     timestamp: Date.now(),
@@ -147,18 +156,20 @@ export async function flushChapterContent(
   edit: PendingChapterEdit,
   seen: SeenChapters,
   inFlightSave: Promise<unknown> | null = null
-): Promise<void> {
+): Promise<boolean> {
   await inFlightSave?.catch(() => {});
   try {
     // A conflict lands in the backup too: leaving never overwrites the other copy.
     await saveChapterEdit(edit, seen, { keepalive: true });
     saveSucceeded();
     localStorage.removeItem(chapterBackupKey(edit.bookId, edit.chapterId));
+    return true;
   } catch (err) {
     console.error('Failed to save chapter content on leaving it:', err);
     // A conflict is an answer, not a failure: the other copy stands and this one is kept.
     if (!isChapterConflict(err)) reportSaveFailure('leave-save', err);
     backupChapterContent(edit, err);
+    return false;
   }
 }
 
