@@ -1,8 +1,9 @@
 import asyncio
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Depends, Response, status
 from app.api.endpoints import users, account_export, webhooks, books, book_cover, chapters, chapter_questions, chapter_content, chapter_ai, book_summary, book_toc, book_questions, export, billing
 from app.core.config import settings, is_production_env
+from app.core.security import require_current_terms
 from app.db.base import get_database
 
 # Bound the readiness ping so a broken/unreachable Mongo fails the probe fast
@@ -17,16 +18,19 @@ router = APIRouter()
 router.include_router(users.router, prefix="/users", tags=["users"])
 router.include_router(account_export.router, prefix="/users", tags=["users"])
 router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
-router.include_router(books.router, prefix="/books", tags=["books"])
-router.include_router(book_cover.router, prefix="/books", tags=["book-cover"])
-router.include_router(chapters.router, prefix="/books", tags=["chapters"])
-router.include_router(chapter_questions.router, prefix="/books", tags=["chapter-questions"])
-router.include_router(chapter_content.router, prefix="/books", tags=["chapter-content"])
-router.include_router(chapter_ai.router, prefix="/books", tags=["chapter-ai"])
-router.include_router(book_summary.router, prefix="/books", tags=["book-summary"])
-router.include_router(book_toc.router, prefix="/books", tags=["book-toc"])
-router.include_router(book_questions.router, prefix="/books", tags=["book-questions"])
-router.include_router(export.router, tags=["export"])
+# The Service needs the current Terms (#1316); users, account export, webhooks
+# and billing stay open.
+terms = [Depends(require_current_terms)]
+router.include_router(books.router, prefix="/books", tags=["books"], dependencies=terms)
+router.include_router(book_cover.router, prefix="/books", tags=["book-cover"], dependencies=terms)
+router.include_router(chapters.router, prefix="/books", tags=["chapters"], dependencies=terms)
+router.include_router(chapter_questions.router, prefix="/books", tags=["chapter-questions"], dependencies=terms)
+router.include_router(chapter_content.router, prefix="/books", tags=["chapter-content"], dependencies=terms)
+router.include_router(chapter_ai.router, prefix="/books", tags=["chapter-ai"], dependencies=terms)
+router.include_router(book_summary.router, prefix="/books", tags=["book-summary"], dependencies=terms)
+router.include_router(book_toc.router, prefix="/books", tags=["book-toc"], dependencies=terms)
+router.include_router(book_questions.router, prefix="/books", tags=["book-questions"], dependencies=terms)
+router.include_router(export.router, tags=["export"], dependencies=terms)
 router.include_router(billing.router, prefix="/billing", tags=["billing"])
 
 # Placeholder secret the CI/test config ships with; a production release still

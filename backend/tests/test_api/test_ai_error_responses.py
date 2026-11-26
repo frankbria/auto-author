@@ -5,6 +5,7 @@ Tests for API AI Error Responses
 Tests that API endpoints properly handle and return structured AI service errors.
 """
 
+from app.core.legal import TERMS_VERSION
 import pytest
 from unittest.mock import patch, AsyncMock
 from fastapi import status
@@ -26,7 +27,8 @@ def mock_user():
     return {
         "auth_id": "test-user-123",
         "email": "test@example.com",
-        "role": "user"
+        "role": "user",
+        "terms_version": TERMS_VERSION,
     }
 
 

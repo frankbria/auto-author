@@ -6,6 +6,7 @@ address in one event, and two events for one failed request. These tests start
 the real SDK the way the app does, with a list in place of the network.
 """
 
+from app.core.legal import TERMS_VERSION
 import json
 import logging
 import os
@@ -91,7 +92,7 @@ async def _work_then_fail():
 async def _signed_in(email: str):
     """A verified better-auth user with a real session: nothing overridden."""
     oid = ObjectId()
-    await (await get_collection("users")).insert_one({"_id": oid, "email": email, "emailVerified": True})
+    await (await get_collection("users")).insert_one({"_id": oid, "email": email, "emailVerified": True, "termsVersion": TERMS_VERSION})
     return real_session_client(await mint_session(oid)), oid
 
 

@@ -123,3 +123,101 @@ describe('every backend caller uses apiFetch', () => {
     }
   );
 });
+
+/**
+ * #1316 — the backend refuses the Service to an account on older Terms. A page
+ * that thinks they are accepted (a bundle from before a Terms bump) reloads, so
+ * ProtectedRoute shows the acceptance screen with the current version.
+ */
+describe('apiFetch on TERMS_NOT_ACCEPTED', () => {
+  const realFetch = global.fetch;
+  let reload: jest.SpyInstance;
+
+  // jsdom has no Response; this has the parts apiFetch reads.
+  const refuse = (detail: unknown) => {
+    const response = { status: 403, ok: false, json: async () => ({ detail }) };
+    global.fetch = jest.fn().mockResolvedValue({ ...response, clone: () => response });
+  };
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  beforeEach(() => {
+    resetUnauthorizedForTests();
+    sessionStorage.clear();
+    reload = jest.spyOn(browser, 'reload').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    global.fetch = realFetch;
+    reload.mockRestore();
+  });
+
+  it('reloads the page once, and the caller still gets the 403', async () => {
+    refuse({ error_code: 'TERMS_NOT_ACCEPTED', message: 'Accept' });
+
+    const responses = await Promise.all([apiFetch('http://api/books'), apiFetch('http://api/books')]);
+    await settle();
+
+    expect(responses.map((r) => r.status)).toEqual([403, 403]);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reload again right after a reload for the same reason', async () => {
+    refuse({ error_code: 'TERMS_NOT_ACCEPTED' });
+
+    await apiFetch('http://api/books');
+    await settle();
+    resetUnauthorizedForTests(); // a reloaded page starts with fresh module state
+    await apiFetch('http://api/books');
+    await settle();
+
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  describe('when the browser blocks storage', () => {
+    let navigation: jest.Mock;
+    beforeEach(() => {
+      jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new DOMException('blocked', 'SecurityError');
+      });
+      jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new DOMException('blocked', 'SecurityError');
+      });
+      // jsdom has no getEntriesByType.
+      navigation = jest.fn();
+      Object.defineProperty(performance, 'getEntriesByType', { value: navigation, configurable: true });
+    });
+    afterEach(() => {
+      jest.restoreAllMocks();
+      delete (performance as { getEntriesByType?: unknown }).getEntriesByType;
+    });
+
+    it('still reloads', async () => {
+      navigation.mockReturnValue([{ type: 'navigate' }] as unknown as PerformanceEntryList);
+      refuse({ error_code: 'TERMS_NOT_ACCEPTED' });
+
+      await apiFetch('http://api/books');
+      await settle();
+
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not reload a page that is itself that reload', async () => {
+      navigation.mockReturnValue([{ type: 'reload' }] as unknown as PerformanceEntryList);
+      refuse({ error_code: 'TERMS_NOT_ACCEPTED' });
+
+      await apiFetch('http://api/books');
+      await settle();
+
+      expect(reload).not.toHaveBeenCalled();
+    });
+  });
+
+  it('leaves any other 403 alone', async () => {
+    refuse('Not enough permissions');
+
+    await apiFetch('http://api/books');
+    await settle();
+
+    expect(reload).not.toHaveBeenCalled();
+  });
+});

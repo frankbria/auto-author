@@ -1,9 +1,10 @@
 from typing import Optional, Dict, List
-from fastapi import HTTPException, status, Request
+from fastapi import Depends, HTTPException, status, Request
 from app.core.better_auth_session import (
     validate_better_auth_session,
     get_better_auth_user,
 )
+from app.core.legal import accepted_current_terms
 from app.db.user import as_app_user
 import logging
 
@@ -152,6 +153,27 @@ async def get_current_user_from_session(request: Request) -> Dict:
         )
 
     return user
+
+
+async def require_current_terms(
+    user: Dict = Depends(get_current_user_from_session),
+) -> Dict:
+    """Refuse the Service to an account that has not accepted the current Terms
+    (#1316). Router-level on the book routers; billing, the account export,
+    deletion and the account read do not use it, so the exits the frontend's
+    acceptance screen offers (#961) keep working. The bypass user, like the
+    frontend's ProtectedRoute under bypass, is not asked."""
+    from app.core.config import settings
+
+    if settings.BYPASS_AUTH or accepted_current_terms(user.get("terms_version")):
+        return user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={
+            "error_code": "TERMS_NOT_ACCEPTED",
+            "message": "Accept the current Terms of Service to keep using Auto Author.",
+        },
+    )
 
 
 async def optional_session_security(request: Request) -> Optional[Dict]:

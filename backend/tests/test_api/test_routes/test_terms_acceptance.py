@@ -44,7 +44,7 @@ async def test_the_app_reads_terms_acceptance_from_the_users_doc(
 @pytest.mark.asyncio
 async def test_an_account_with_no_recorded_acceptance_gets_none(reinit_db):
     """An account created before #789 has nothing recorded; none is invented."""
-    seeded = await _seed_better_auth_user("before-789@example.com")
+    seeded = await _seed_better_auth_user("before-789@example.com", terms_version=None)
 
     user = await _user_after_a_request(seeded)
 
@@ -82,7 +82,7 @@ async def test_deactivation_keeps_no_empty_entry_for_an_account_with_no_record(
     reinit_db,
 ):
     """The users doc has neither; the retained record leaves them out."""
-    seeded = await _seed_better_auth_user("before-789-deleted@example.com")
+    seeded = await _seed_better_auth_user("before-789-deleted@example.com", terms_version=None)
 
     retained = await _retained_after_deletion(seeded)
 

@@ -8,6 +8,7 @@ valid, an expired, a revoked and another user's cookie get from a route is
 therefore what production gives them.
 """
 
+from app.core.legal import TERMS_VERSION
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -27,7 +28,7 @@ async def _a_better_auth_user(email: str) -> ObjectId:
     now = datetime.now(timezone.utc)
     oid = ObjectId()
     await (await get_collection("users")).insert_one(
-        {"_id": oid, "email": email, "name": "Ada Writer", "emailVerified": True, "createdAt": now, "updatedAt": now}
+        {"_id": oid, "email": email, "name": "Ada Writer", "emailVerified": True, "termsVersion": TERMS_VERSION, "createdAt": now, "updatedAt": now}
     )
     return oid
 
