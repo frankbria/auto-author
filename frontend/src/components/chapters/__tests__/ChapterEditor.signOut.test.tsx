@@ -168,6 +168,53 @@ describe('ChapterEditor: signing out from a book page (#1091)', () => {
     view.unmount();
   });
 
+  it('also saves an edit typed while the first save runs, before signing out', async () => {
+    const view = await openWithUnsavedEdit();
+    let finishFirst: (value: SaveResult) => void = () => {};
+    mockBookClient.saveChapterContent
+      .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)))
+      .mockResolvedValue({ last_modified: 'T3' } as SaveResult);
+
+    let signedOut: Promise<boolean> = Promise.resolve(false);
+    await act(async () => {
+      signedOut = signOutOrNotify();
+    });
+    act(() => {
+      editorIn(view.container).commands.insertContent(' two');
+    });
+    await act(async () => {
+      finishFirst({ last_modified: 'T2' } as SaveResult);
+      await jest.advanceTimersByTimeAsync(0);
+    });
+
+    expect(await signedOut).toBe(true);
+    expect(mockBookClient.saveChapterContent).toHaveBeenLastCalledWith(
+      'bk', 'A', '<p>Alpha one two</p>', true, expect.objectContaining({ expectedLastModified: 'T2' })
+    );
+    expect(mockBookClient.saveChapterContent.mock.invocationCallOrder[1]).toBeLessThan(
+      mockSignOut.mock.invocationCallOrder[0]
+    );
+    expect(confirmSpy).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it('asks about an edit that could not be saved even when the browser could not keep a copy', async () => {
+    mockBookClient.saveChapterContent.mockRejectedValue(SERVER_DOWN);
+    const view = await openWithUnsavedEdit();
+    const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError');
+    });
+    confirmSpy.mockReturnValue(false);
+
+    expect(await signOutAndLeave(view)).toBe(false);
+
+    setItem.mockRestore();
+    expect(localStorage.getItem(KEY)).toBeNull();
+    expect(confirmSpy).toHaveBeenCalledWith(UNSAVED_WRITING_WARNING);
+    expect(mockSignOut).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
   it('a sign-out that fails clears nothing', async () => {
     mockBookClient.saveChapterContent.mockRejectedValue(SERVER_DOWN);
     mockSignOut.mockResolvedValue({ data: null, error: { message: 'nope' } });

@@ -97,6 +97,23 @@ describe('BookSummaryPage: signing out (#1091)', () => {
     view.unmount();
   });
 
+  it('asks about text that could not be saved even when the browser could not keep a copy', async () => {
+    mockedClient.saveBookSummary.mockRejectedValue(new Error('Network error'));
+    confirmSpy.mockReturnValue(false);
+    const view = await openedAndTyped('Never reached the server');
+    const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError');
+    });
+
+    expect(await signOutAndLeave(view)).toBe(false);
+
+    setItem.mockRestore();
+    expect(localStorage.getItem(UNSAVED)).toBeNull();
+    expect(confirmSpy).toHaveBeenCalledWith(UNSAVED_WRITING_WARNING);
+    expect(mockSignOut).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
   it('waits for a save in flight, and a save that fails after the sign-out writes nothing back', async () => {
     const view = await openedAndTyped('First');
     // The debounced save starts and is still running when the user signs out.

@@ -78,6 +78,11 @@ export default function BookSummaryPage() {
   // meanwhile (a keystroke, a dictation result, a retry, a late failure) writes
   // their text back to the browser the sign-out cleared.
   const openedIn = useRef(signOutCount());
+  // The text in the field now, for a sign-out that waits on a save (#1091).
+  const latestSummary = useRef(summary);
+  useEffect(() => {
+    latestSummary.current = summary;
+  }, [summary]);
   const persist = useCallback((text: string) => {
     saveInFlight.current = true;
     const saving = bookClient.saveBookSummary(bookId, text)
@@ -200,11 +205,21 @@ export default function BookSummaryPage() {
     () =>
       beforeSignOut(async () => {
         await savingRef.current;
-        if (!bookId || (!summaryLoaded && !userEditedRef.current)) return;
+        if (!bookId || (!summaryLoaded && !userEditedRef.current)) return false;
         if (saveTimeout.current) clearTimeout(saveTimeout.current);
-        if (summary !== lastSaved.current) await persist(summary);
+        // Text typed while a save runs is saved too; text whose save failed is
+        // not tried again here, but reported, so the user is asked about it even
+        // if the browser could not keep a copy.
+        let tried: string | null = null;
+        for (let round = 0; round < 3; round++) {
+          const text = latestSummary.current;
+          if (text === lastSaved.current || text === tried) break;
+          tried = text;
+          await persist(text);
+        }
+        return latestSummary.current !== lastSaved.current;
       }),
-    [summary, bookId, summaryLoaded, persist]
+    [bookId, summaryLoaded, persist]
   );
 
   // A failed save is tried again by Try again and by the browser coming back

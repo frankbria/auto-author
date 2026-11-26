@@ -292,21 +292,25 @@ export function useChapterContent({
   }, []);
 
   // An explicit sign-out saves the edit still inside the autosave delay first,
-  // while the session can save it (#1091). A failed save leaves a backup, which
-  // sign-out asks about before removing it.
+  // while the session can save it (#1091), and then any edit typed while that
+  // save ran. Whatever is still unsaved after that is reported, and sign-out asks
+  // about it before removing it, even where no backup could be stored.
   useEffect(
     () =>
       beforeSignOut(async () => {
         // A save in flight settles first, so a failure is backed up and asked about.
         await inFlightSaveRef.current?.catch(() => {});
-        const edit = unsavedRef.current;
-        if (!edit) {
-          setBackupWrites((n) => n + 1);
-          return;
+        let tried: PendingChapterEdit | null = null;
+        for (let round = 0; round < 3; round++) {
+          const edit = unsavedRef.current;
+          // Nothing pending, or this edit already failed: stop and report it.
+          if (!edit || edit === tried) break;
+          tried = edit;
+          const saved = await flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
+          if (saved && unsavedRef.current === edit) unsavedRef.current = null;
         }
-        const saved = await flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
-        if (saved && unsavedRef.current === edit) unsavedRef.current = null;
         setBackupWrites((n) => n + 1);
+        return unsavedRef.current !== null;
       }),
     []
   );

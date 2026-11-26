@@ -30,13 +30,17 @@ let signOuts = 0;
  */
 export const signOutCount = () => signOuts;
 
-type BeforeSignOut = () => Promise<unknown>;
+/** Resolves true when it leaves text that never reached the server. */
+type BeforeSignOut = () => Promise<boolean | void>;
 const beforeSignOutHandlers = new Set<BeforeSignOut>();
 
 /**
  * Work an explicit sign-out waits for, while the session can still save (#1091):
- * an open editor's edit still inside its autosave delay. Returns the
- * unregister function, so it can be a React effect's cleanup.
+ * an open editor's edit still inside its autosave delay. A handler resolves
+ * true when text is still unsaved afterwards, which the user is then asked
+ * about even if the browser could not store a copy of it (a full or blocked
+ * localStorage). Returns the unregister function, so it can be a React
+ * effect's cleanup.
  */
 export function beforeSignOut(handler: BeforeSignOut): () => void {
   beforeSignOutHandlers.add(handler);
@@ -69,8 +73,11 @@ export async function signOutOrNotify({
   quiet = false,
   leavePage = false,
 } = {}): Promise<boolean> {
-  await Promise.all([...beforeSignOutHandlers].map((handler) => handler().catch(() => {})));
-  if (hasUnsavedLocalWriting() && !window.confirm(UNSAVED_WRITING_WARNING)) return false;
+  const leftUnsaved = await Promise.all(
+    [...beforeSignOutHandlers].map((handler) => handler().then((unsaved) => unsaved === true, () => true))
+  );
+  const unsaved = leftUnsaved.includes(true) || hasUnsavedLocalWriting();
+  if (unsaved && !window.confirm(UNSAVED_WRITING_WARNING)) return false;
   underwayUntil = Infinity;
   const failed = await authClient.signOut().then(
     ({ error }) => Boolean(error),
