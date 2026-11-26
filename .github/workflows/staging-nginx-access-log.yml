@@ -1,0 +1,114 @@
+name: Staging nginx Access Log
+
+# Gives the dev.autoauthor.app vhost on the staging box its own access log
+# (#1223). Twice on 2026-10-23 the post-deploy E2E timed out loading the sign-in
+# page, and it could not be told whether the runner's requests reached the box:
+# the vhost names no access_log, and the default log had no lines for it.
+#
+# nginx on the box is hand-configured and shared with other apps, so this is a
+# manual workflow with a dry run as its default. The edit itself, and every
+# reason it refuses, is in scripts/staging-nginx-access-log.sh (tested by
+# scripts/test_staging_nginx_access_log.py). With apply on, it then requests the
+# sign-in page from this runner with a marker in the User-Agent and checks that
+# the request landed in the new log: the outcome, not "the file was written".
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Change nginx. Off: report what would change, and change nothing.'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  # Its own group: it reloads nginx but never touches /opt/auto-author or the
+  # containers the deploy group guards.
+  group: staging-nginx
+  cancel-in-progress: false
+
+jobs:
+  access-log:
+    name: Add the dev.autoauthor.app access log on staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: staging
+      url: https://dev.autoauthor.app
+    # The dispatch input reaches every script as a variable, never as text
+    # GitHub pastes into the script (#816).
+    env:
+      APPLY: ${{ inputs.apply }}
+
+    steps:
+      # First (#816); scripts/test_workflow_inputs_not_in_run.py runs this script.
+      - name: Check the apply flag
+        run: |
+          if [[ ! "$APPLY" =~ ^(true|false)$ ]]; then
+            echo "::error::apply must be true or false"
+            exit 1
+          fi
+
+      # Same access path as the deploy: the box is reached over Tailscale. Both
+      # tags are required — Tailscale matches the OAuth client's FULL tag set.
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+        with:
+          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_AUTH_SECRET }}
+          tags: tag:ci,tag:staging-server
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Find the box on the tailnet
+        env:
+          CONFIGURED_HOST: ${{ secrets.STAGING_TS_HOST || secrets.HOST }}
+        run: |
+          box=$(scripts/find-staging-box.sh "$CONFIGURED_HOST")
+          echo "::add-mask::$box"
+          echo "STAGING_BOX=$box" >> "$GITHUB_ENV"
+
+      - name: Setup SSH
+        env:
+          STAGING_KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/staging_key
+          chmod 600 ~/.ssh/staging_key
+          # Pinned host key (#859); see sync-staging-env.yml.
+          if [ -z "$STAGING_KNOWN_HOSTS" ]; then
+            echo "::error::STAGING_KNOWN_HOSTS is empty; refusing to SSH without a pinned host key"
+            exit 1
+          fi
+          printf '%s\n' "$STAGING_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Add the access log (or report what would change)
+        run: |
+          # The flag was checked in the first step; only these two words reach the box.
+          if [ "$APPLY" = true ]; then mode=apply; else mode=dry-run; fi
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@"$STAGING_BOX" "bash -s -- $mode" < scripts/staging-nginx-access-log.sh
+
+      - name: Check a request from this runner reaches the new log
+        if: ${{ inputs.apply }}
+        run: |
+          marker="auto-author-1223-check-${GITHUB_RUN_ID}"
+          curl -sS -o /dev/null --max-time 20 -A "$marker" -w 'sign-in page: %{http_code} in %{time_total}s\n' \
+            https://dev.autoauthor.app/auth/sign-in
+          sleep 2
+          ssh -i ~/.ssh/staging_key -o StrictHostKeyChecking=yes -o HostKeyAlias=auto-author-staging -o ConnectTimeout=30 \
+            ${{ secrets.USER }}@"$STAGING_BOX" "bash -s -- verify $marker" < scripts/staging-nginx-access-log.sh
+
+      - name: Summary
+        if: always()
+        run: |
+          { echo '## Staging nginx access log (#1223)';
+            echo "- applied: $APPLY";
+            echo "- result: ${{ job.status }}";
+            echo '- log: /var/log/nginx/dev.autoauthor.app.access.log on the box';
+          } >> "$GITHUB_STEP_SUMMARY"
