@@ -88,7 +88,8 @@ export async function middleware(request: NextRequest) {
   // Redirect to sign-in if accessing protected route without session
   if (!sessionToken) {
     const signInUrl = new URL('/auth/sign-in', request.url);
-    signInUrl.searchParams.set('redirect', pathname);
+    // The query too: a link such as ?chapter= must survive sign-in (#1094).
+    signInUrl.searchParams.set('redirect', pathname + request.nextUrl.search);
     return NextResponse.redirect(signInUrl);
   }
 

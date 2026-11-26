@@ -32,6 +32,13 @@ describe('middleware route protection', () => {
     process.env.BYPASS_AUTH = originalBypass;
   });
 
+  it('keeps the query in the redirect param, so a chapter link survives sign-in (#1094)', async () => {
+    const res = await middleware(requestFor('/dashboard/books/b1?chapter=c2'));
+    const location = new URL(res.headers.get('location')!);
+    expect(location.pathname).toBe('/auth/sign-in');
+    expect(location.searchParams.get('redirect')).toBe('/dashboard/books/b1?chapter=c2');
+  });
+
   it('redirects unauthenticated /profile to sign-in with redirect param', async () => {
     const res = await middleware(requestFor('/profile'));
     expect(res.status).toBe(307);

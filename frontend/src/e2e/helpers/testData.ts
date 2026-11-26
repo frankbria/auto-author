@@ -270,8 +270,9 @@ export async function openSeededChapter(
   const { book, chapters } = await createTestBookWithTOC(page, {
     title: `Test Book ${Date.now()}`,
   });
-  const chapterId = chapters[0].id;
+  let chapterId: string;
   try {
+    chapterId = chapters[0].id;
     await page.goto(`/dashboard/books/${book.id}?chapter=${chapterId}`);
     await expect(page.locator('.tiptap')).toBeVisible();
   } catch (error) {
