@@ -88,7 +88,14 @@ const nextConfig: NextConfig = {
         source: '/sign-up',
         destination: '/sign-up/',
         permanent: true,
-      }
+      },
+      // Legacy chapter URL: the book page opens the chapter named in ?chapter=
+      // (#855). A redirect here, not a page, so no editor ever mounts (#1094).
+      {
+        source: '/dashboard/books/:bookId/chapters/:chapterId',
+        destination: '/dashboard/books/:bookId?chapter=:chapterId',
+        permanent: false,
+      },
     ];
   },
 };

@@ -8,11 +8,19 @@
  * Deterministic: chapter-content load and the transform-style call are mocked
  * via page.route(); no real backend / OpenAI. Runs with BYPASS_AUTH=true.
  *
- * The legacy editor route auto-redirects to the tabbed interface after 2s; we
- * cancel only that one timer so the editor stays mounted.
+ * The book and its chapter are seeded through the API and opened on the book
+ * page (#1094); the AI calls and chapter content stay mocked.
  */
 
 import { test, expect } from '@playwright/test';
+import { deleteTestBook, openSeededChapter } from './helpers/testData';
+
+let bookId: string | undefined;
+
+test.afterEach(async ({ page }) => {
+  if (bookId) await deleteTestBook(page, bookId);
+  bookId = undefined;
+});
 
 const BOOK_ID = 'e2e-style-book';
 const CHAPTER_ID = 'e2e-style-chapter';
@@ -21,13 +29,6 @@ const TRANSFORMED = '<p>The feline assumed a seated posture upon the floor cover
 
 test.describe('Style transformation (issue #58)', () => {
   test('transforms a chapter, previews before/after, applies, and reverts', async ({ page }) => {
-    await page.addInitScript(() => {
-      const original = window.setTimeout.bind(window);
-      // @ts-expect-error - test shim narrows the overload deliberately
-      window.setTimeout = (handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
-        timeout === 2000 ? 0 : original(handler, timeout as number, ...args);
-    });
-
     // Chapter loads with existing content.
     await page.route('**/books/*/chapters/*/content*', (route) =>
       route.fulfill({
@@ -73,7 +74,7 @@ test.describe('Style transformation (issue #58)', () => {
       })
     );
 
-    await page.goto(`/dashboard/books/${BOOK_ID}/chapters/${CHAPTER_ID}`);
+    ({ bookId } = await openSeededChapter(page));
 
     // Editor loads with the original content.
     await expect(page.locator('.tiptap')).toContainText(ORIGINAL);

@@ -12,6 +12,14 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { deleteTestBook, openSeededChapter } from './helpers/testData';
+
+let bookId: string | undefined;
+
+test.afterEach(async ({ page }) => {
+  if (bookId) await deleteTestBook(page, bookId);
+  bookId = undefined;
+});
 
 const BOOK_ID = 'e2e-voice-book';
 const CHAPTER_ID = 'e2e-voice-chapter';
@@ -21,13 +29,6 @@ const CLEANED = '<p>The cat sat on the mat.</p>';
 
 test.describe('Voice enhancement (issue #56)', () => {
   test('cleans up dictation, previews raw/cleaned, applies, and reverts', async ({ page }) => {
-    await page.addInitScript(() => {
-      const original = window.setTimeout.bind(window);
-      // @ts-expect-error - test shim narrows the overload deliberately
-      window.setTimeout = (handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
-        timeout === 2000 ? 0 : original(handler, timeout as number, ...args);
-    });
-
     // Chapter loads with the raw dictated content already in the editor.
     await page.route('**/books/*/chapters/*/content*', (route) =>
       route.fulfill({
@@ -73,7 +74,7 @@ test.describe('Voice enhancement (issue #56)', () => {
       })
     );
 
-    await page.goto(`/dashboard/books/${BOOK_ID}/chapters/${CHAPTER_ID}`);
+    ({ bookId } = await openSeededChapter(page));
 
     // Editor loads with the raw dictation.
     await expect(page.locator('.tiptap')).toContainText(RAW);

@@ -7,11 +7,19 @@
  *   - The regenerate button is disabled once a question hits its regeneration cap
  *
  * Deterministic: questions, progress and the regenerate endpoints are mocked via
- * page.route(); no real backend / OpenAI. Runs with BYPASS_AUTH=true. Mirrors the
- * #53 progress spec (cancel the editor's 2s auto-redirect so it stays mounted).
+ * page.route(); no real backend / OpenAI. Runs with BYPASS_AUTH=true. The book
+ * is seeded through the API and opened on the book page (#1094).
  */
 
 import { test, expect } from '@playwright/test';
+import { deleteTestBook, openSeededChapter } from './helpers/testData';
+
+let bookId: string | undefined;
+
+test.afterEach(async ({ page }) => {
+  if (bookId) await deleteTestBook(page, bookId);
+  bookId = undefined;
+});
 
 const BOOK_ID = 'e2e-regen-book';
 const CHAPTER_ID = 'e2e-regen-chapter';
@@ -32,13 +40,6 @@ function question(id: string, order: number, text: string, regenerationCount = 0
 }
 
 async function mockEditor(page: import('@playwright/test').Page) {
-  await page.addInitScript(() => {
-    const original = window.setTimeout.bind(window);
-    // @ts-expect-error - test shim narrows the overload deliberately
-    window.setTimeout = (handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
-      timeout === 2000 ? 0 : original(handler, timeout as number, ...args);
-  });
-
   await page.route('**/books/*/chapters/*/content*', (route) =>
     route.fulfill({
       status: 200,
@@ -96,7 +97,7 @@ test.describe('Question regeneration (issue #62)', () => {
       })
     );
 
-    await page.goto(`/dashboard/books/${BOOK_ID}/chapters/${CHAPTER_ID}`);
+    ({ bookId } = await openSeededChapter(page));
     await page.getByRole('tab', { name: /Interview Questions/i }).click();
 
     await expect(page.getByText('Original first question')).toBeVisible();
@@ -123,7 +124,7 @@ test.describe('Question regeneration (issue #62)', () => {
       })
     );
 
-    await page.goto(`/dashboard/books/${BOOK_ID}/chapters/${CHAPTER_ID}`);
+    ({ bookId } = await openSeededChapter(page));
     await page.getByRole('tab', { name: /Interview Questions/i }).click();
 
     await expect(page.getByText('Capped question')).toBeVisible();
@@ -155,7 +156,7 @@ test.describe('Question regeneration (issue #62)', () => {
       });
     });
 
-    await page.goto(`/dashboard/books/${BOOK_ID}/chapters/${CHAPTER_ID}`);
+    ({ bookId } = await openSeededChapter(page));
     await page.getByRole('tab', { name: /Interview Questions/i }).click();
 
     await expect(page.getByText('Original set question')).toBeVisible();
