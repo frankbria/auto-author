@@ -18,7 +18,7 @@ import {
 import { useSpeechRecognitionSupported } from '@/lib/voice/useSpeechRecognitionSupported';
 import { SummarySaveNotices } from '@/components/books/SummarySaveNotices';
 import { readStored, removeStored, writeStored } from '@/lib/storage/safeLocalStorage';
-import { beforeSignOut, signOutCount } from '@/lib/sign-out';
+import { beforeSignOut, signOutCount, trackSave } from '@/lib/sign-out';
 
 // Where a summary whose save failed is kept (#832): apart from the working copy,
 // which every load and every keystroke writes over.
@@ -220,6 +220,21 @@ export default function BookSummaryPage() {
         return latestSummary.current !== lastSaved.current;
       }),
     [bookId, summaryLoaded, persist]
+  );
+
+  // Leaving the page (or the book) inside the save delay saves the text rather
+  // than dropping it (#1091): its only other copy is the working copy, which a
+  // sign-out removes. The sign-out waits for this save; a failure keeps the
+  // unsaved copy, which it asks about.
+  useEffect(
+    () => () => {
+      const text = latestSummary.current;
+      // Only what the writer typed on this visit; the loaded text is not theirs to resend.
+      if (!bookId || !userEditedRef.current || text === lastSaved.current) return;
+      if (signOutCount() !== openedIn.current) return;
+      void trackSave(persist(text));
+    },
+    [bookId, persist]
   );
 
   // A failed save is tried again by Try again and by the browser coming back

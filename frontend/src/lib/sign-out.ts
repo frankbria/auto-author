@@ -49,6 +49,22 @@ export function beforeSignOut(handler: BeforeSignOut): () => void {
   };
 }
 
+const pendingSaves = new Set<Promise<unknown>>();
+
+/**
+ * A save from a page or editor that is already gone (its leaving flush, #1091).
+ * No beforeSignOut handler covers it any more, so a sign-out waits for it
+ * before deciding: a failure then leaves its backup in time to be asked about.
+ */
+export function trackSave<T>(save: Promise<T>): Promise<T> {
+  pendingSaves.add(save);
+  const settled = () => {
+    pendingSaves.delete(save);
+  };
+  save.then(settled, settled);
+  return save;
+}
+
 export const UNSAVED_WRITING_WARNING =
   "Some of your writing could not be saved to your account and is only in this browser. " +
   "Signing out removes it from this browser. Sign out anyway?";
@@ -73,6 +89,7 @@ export async function signOutOrNotify({
   quiet = false,
   leavePage = false,
 } = {}): Promise<boolean> {
+  await Promise.all([...pendingSaves].map((save) => save.catch(() => {})));
   const leftUnsaved = await Promise.all(
     [...beforeSignOutHandlers].map((handler) => handler().then((unsaved) => unsaved === true, () => true))
   );

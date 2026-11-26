@@ -114,6 +114,29 @@ describe('BookSummaryPage: signing out (#1091)', () => {
     view.unmount();
   });
 
+  it('leaving the page inside the save delay saves the text, and a later sign-out asks if that failed', async () => {
+    let failLeaving: (err: Error) => void = () => {};
+    mockedClient.saveBookSummary.mockImplementation(
+      () => new Promise((_resolve, reject) => (failLeaving = reject)) as never
+    );
+    confirmSpy.mockReturnValue(false);
+    const view = await openedAndTyped('Typed, then left');
+    view.unmount();
+    expect(mockedClient.saveBookSummary).toHaveBeenCalledWith('book-1', 'Typed, then left');
+
+    let signedOut: Promise<boolean> = Promise.resolve(true);
+    await act(async () => {
+      signedOut = signOutOrNotify();
+    });
+    await act(async () => {
+      failLeaving(new Error('Network error'));
+    });
+
+    expect(await signedOut).toBe(false);
+    expect(confirmSpy).toHaveBeenCalledWith(UNSAVED_WRITING_WARNING);
+    expect(localStorage.getItem(UNSAVED)).toBe('Typed, then left');
+  });
+
   it('waits for a save in flight, and a save that fails after the sign-out writes nothing back', async () => {
     const view = await openedAndTyped('First');
     // The debounced save starts and is still running when the user signs out.

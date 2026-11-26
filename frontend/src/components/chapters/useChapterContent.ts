@@ -8,7 +8,7 @@ import bookClient, { type ChapterSaveConflict } from '@/lib/api/bookClient';
 import { usePerformanceTracking } from '@/hooks/usePerformanceTracking';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
 import { AUTO_SAVE_DEFAULT_SECONDS, isValidAutoSaveInterval } from '@/lib/constants/auto-save';
-import { beforeSignOut, signOutCount } from '@/lib/sign-out';
+import { beforeSignOut, signOutCount, trackSave } from '@/lib/sign-out';
 import {
   validateChapterBackup,
   getValidatedItem,
@@ -307,7 +307,16 @@ export function useChapterContent({
           if (!edit || edit === tried) break;
           tried = edit;
           const saved = await flushChapterContent(edit, seenRef.current, inFlightSaveRef.current);
-          if (saved && unsavedRef.current === edit) unsavedRef.current = null;
+          if (!saved) continue;
+          // What markSaved records, since the user may still cancel the sign-out
+          // and keep writing from here.
+          autoSaveFailuresRef.current = 0;
+          setLastAutoSavedContent(edit.content);
+          if (unsavedRef.current === edit) {
+            unsavedRef.current = null;
+            setAutoSavePending(false);
+            setHasUnsavedChanges(false);
+          }
         }
         setBackupWrites((n) => n + 1);
         return unsavedRef.current !== null;
@@ -323,7 +332,9 @@ export function useChapterContent({
       const edit = unsavedRef.current;
       unsavedRef.current = null;
       autoSaveFailuresRef.current = 0;
-      if (edit) void flushChapterContent(edit, seenRef.current, inFlightSaveRef.current, sessionRef.current);
+      if (edit) {
+        void trackSave(flushChapterContent(edit, seenRef.current, inFlightSaveRef.current, sessionRef.current));
+      }
     },
     [bookId, chapterId]
   );

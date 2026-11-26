@@ -215,6 +215,60 @@ describe('ChapterEditor: signing out from a book page (#1091)', () => {
     view.unmount();
   });
 
+  it('after a flushed edit and a cancelled sign-out, going back to the old text still saves', async () => {
+    mockBookClient.saveChapterContent.mockResolvedValue({ last_modified: 'T2' } as SaveResult);
+    // Another chapter's backup makes the sign-out ask; the writer says no.
+    localStorage.setItem('chapter-backup-bk-Z', JSON.stringify({ content: '<p>z</p>', timestamp: Date.now(), error: 'x' }));
+    confirmSpy.mockReturnValue(false);
+    const view = await openWithUnsavedEdit();
+
+    expect(await signOutAndLeave(view)).toBe(false);
+    expect(mockBookClient.saveChapterContent).toHaveBeenLastCalledWith(
+      'bk', 'A', '<p>Alpha one</p>', true, expect.anything()
+    );
+
+    act(() => {
+      editorIn(view.container).commands.setContent('<p>Alpha</p>', { emitUpdate: true });
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(5000);
+    });
+
+    expect(mockBookClient.saveChapterContent).toHaveBeenLastCalledWith(
+      'bk', 'A', '<p>Alpha</p>', true, expect.anything()
+    );
+    view.unmount();
+  });
+
+  it('waits for the leaving save of an editor already closed, and asks if it failed', async () => {
+    let failLeaving: (err: Error) => void = () => {};
+    mockBookClient.saveChapterContent.mockImplementation(
+      () => new Promise((_resolve, reject) => (failLeaving = reject)) as never
+    );
+    confirmSpy.mockReturnValue(false);
+    const view = await openWithUnsavedEdit();
+    // The writer leaves the chapter; its save is still running.
+    view.unmount();
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    expect(mockBookClient.saveChapterContent).toHaveBeenCalledTimes(1);
+
+    let signedOut: Promise<boolean> = Promise.resolve(true);
+    await act(async () => {
+      signedOut = signOutOrNotify();
+    });
+    expect(confirmSpy).not.toHaveBeenCalled();
+    await act(async () => {
+      failLeaving(SERVER_DOWN);
+      await jest.advanceTimersByTimeAsync(0);
+    });
+
+    expect(await signedOut).toBe(false);
+    expect(confirmSpy).toHaveBeenCalledWith(UNSAVED_WRITING_WARNING);
+    expect(JSON.parse(localStorage.getItem(KEY) ?? 'null')?.content).toBe('<p>Alpha one</p>');
+  });
+
   it('a sign-out that fails clears nothing', async () => {
     mockBookClient.saveChapterContent.mockRejectedValue(SERVER_DOWN);
     mockSignOut.mockResolvedValue({ data: null, error: { message: 'nope' } });
