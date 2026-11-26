@@ -14,14 +14,16 @@ from bson import ObjectId
 
 from app.db.base import get_collection
 from app.db.user import ensure_user_indexes
+from app.core.legal import TERMS_VERSION
 from tests.session_cookies import mint_session as _mint_session, real_session_client as _client
 
 
 async def _seed_better_auth_user(
-    email: str, sessions: int = 1, name: str = "Del Eted"
+    email: str, sessions: int = 1, name: str = "Del Eted", terms_version=TERMS_VERSION
 ) -> dict:
     """Insert a better-auth user with a credential account, a twoFactor row and
-    ``sessions`` live sessions. Returns the user id and the session tokens."""
+    ``sessions`` live sessions. Returns the user id and the session tokens.
+    ``terms_version`` None leaves no recorded acceptance (#1316)."""
     now = datetime.now(timezone.utc)
     user_oid = ObjectId()
     await (await get_collection("users")).insert_one(
@@ -33,6 +35,7 @@ async def _seed_better_auth_user(
             "twoFactorEnabled": True,
             "createdAt": now,
             "updatedAt": now,
+            **({"termsVersion": terms_version} if terms_version else {}),
         }
     )
     await (await get_collection("account")).insert_one(
@@ -230,7 +233,7 @@ async def test_deletion_keeps_the_account_record_until_an_admin_erases_it(
     down to its id and deletion date, and nothing that identifies the person survives."""
     email = "erase.me@example.com"
     identifying = (email, "Zebedee", "Quillfeather", "cus_erase_me")
-    seeded = await _seed_better_auth_user(email, name="Zebedee Quillfeather")
+    seeded = await _seed_better_auth_user(email, name="Zebedee Quillfeather", terms_version=None)
     users = await get_collection("users")
 
     async with _client(seeded["tokens"][0]) as c:

@@ -30,6 +30,7 @@ caller's own ``auth_id``; ``DELETE /users/me`` deletes the caller's books, and
 ``DELETE /users/{auth_id}`` is an admin's, both by ``owner_id``.
 """
 
+from app.core.legal import TERMS_VERSION
 import io
 import typing
 from datetime import datetime, timezone
@@ -235,7 +236,7 @@ async def _signed_in(email: str):
     now = datetime.now(timezone.utc)
     oid = ObjectId()
     await (await get_collection("users")).insert_one(
-        {"_id": oid, "email": email, "name": email.split("@")[0], "emailVerified": True, "createdAt": now, "updatedAt": now}
+        {"_id": oid, "email": email, "name": email.split("@")[0], "emailVerified": True, "termsVersion": TERMS_VERSION, "createdAt": now, "updatedAt": now}
     )
     client = real_session_client(await mint_session(oid))
     assert (await client.get("/api/v1/users/me")).status_code == 200

@@ -7,6 +7,7 @@ detail to clients. This test triggers a handled 500 and asserts the client
 sees a generic message that does NOT contain the raised exception's text.
 """
 
+from app.core.legal import TERMS_VERSION
 from unittest.mock import patch, AsyncMock
 
 import pytest
@@ -21,7 +22,7 @@ SENTINEL = "INTERNAL_LEAK_SENTINEL_a1b2c3_db_connection_string"
 @pytest.fixture
 async def client():
     async def override_get_current_user():
-        return {"auth_id": "test-user-123", "email": "t@example.com", "role": "user"}
+        return {"auth_id": "test-user-123", "email": "t@example.com", "role": "user", "terms_version": TERMS_VERSION}
 
     app.dependency_overrides[get_current_user_from_session] = override_get_current_user
     async with AsyncClient(

@@ -25,6 +25,7 @@ for _storage_field in (
 # AI tests assert the documented model defaults, whatever a developer's
 # backend/.env sets (#926). The module-level ai_service singleton is built at
 # import and reads these, so reset them before any app module imports it.
+from app.core.legal import TERMS_VERSION
 from app.core.config import Settings, settings as _settings
 
 # Every AI_* field, so a setting added later is reset without editing this list.
@@ -342,6 +343,7 @@ def test_user():
         "bio": "I am a test user",
         "role": "user",
         "plan": "free",
+        "terms_version": TERMS_VERSION,  # #1316: the book routers need it
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),
         "books": [],
@@ -367,6 +369,7 @@ def fake_user():
         "bio": "I am a fake user",
         "role": "user",
         "plan": "free",
+        "terms_version": TERMS_VERSION,  # #1316: the book routers need it
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),
         "books": [],
