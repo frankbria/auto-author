@@ -62,6 +62,9 @@ VALIDATED = {
         ),
         "MANAGED_PAYMENTS": (["true", "false"], ["yes", "1", "True", "true; id", "true\nfalse"]),
     },
+    ("staging-nginx-access-log.yml", "access-log"): {
+        "APPLY": (["true", "false"], ["yes", "1", "True", "true; id", "true\nfalse"]),
+    },
 }
 
 

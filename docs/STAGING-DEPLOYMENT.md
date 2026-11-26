@@ -267,6 +267,13 @@ Doing step 2 before step 1 makes Stripe reject every checkout (the API returns 5
 5. **nginx.** Upstreams point at `127.0.0.1:8000` / `127.0.0.1:3002`. Unchanged
    from the PM2 setup — which is why those ports were kept.
 
+   The `dev.autoauthor.app` vhost logs to
+   `/var/log/nginx/dev.autoauthor.app.access.log` (#1223), added by the manual
+   **Staging nginx Access Log** workflow (`staging-nginx-access-log.yml`; dry
+   run by default). Look there first when the post-deploy E2E times out
+   loading a page: no lines for the window means the requests never reached
+   the box.
+
    The frontend `location /` **must** carry
    `proxy_set_header X-Real-IP $remote_addr;`. better-auth buckets its sign-in
    rate limit (3 per 10s) by client IP and reads `x-real-ip` first (#602); with
