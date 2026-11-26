@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from pymongo import ReturnDocument
 
-from app.api.endpoints.billing import cancel_subscription_for_deletion
+from app.api.endpoints.billing_stripe import cancel_subscription_for_deletion
 from app.core.security import get_current_user_from_session, SessionRoleChecker
 from app.schemas.user import UserUpdate, UserResponse
 from app.db.user import as_app_user
