@@ -6,24 +6,24 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     # Core FastAPI dependencies
-    "fastapi==0.162.0",
+    "fastapi==0.162.7",
     "uvicorn==0.54.0",
     "python-multipart==0.0.33",
     # Database
-    "pymongo==4.19.0",
+    "pymongo==4.20.0",
     # Configuration and environment
     "python-dotenv==1.2.4",
     "pydantic[email]==2.14.3",
-    "pydantic-settings==2.16.2",
+    "pydantic-settings==2.16.3",
     # AI and external APIs
-    "openai==3.46.0",
+    "openai==3.51.0",
     "requests==2.34.2",
     # Authentication is better-auth (TypeScript) end to end: the backend only
     # validates session cookies, so it needs no JWT or password-hashing library.
     # python-jose (zero importers, dragged in ecdsa/rsa/pyasn1) and passlib
     # (helpers had no production callers) were removed in #342.
     # AWS SDK for transcription and S3
-    "boto3==1.43.125",
+    "boto3==1.44.3",
     # Image processing and storage
     "cloudinary==1.47.0",
     "pillow==13.0.0",
@@ -32,7 +32,7 @@ dependencies = [
     "python-docx==1.2.0",
     "stripe==17.0.0",
     # Error tracking (issue #334) — inert unless SENTRY_DSN is set
-    "sentry-sdk[fastapi]==2.74.0",
+    "sentry-sdk[fastapi]==2.75.0",
     "markdownify==1.2.3",
 ]
 
@@ -43,12 +43,12 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest==9.2.0",
-    "pytest-asyncio==1.4.1.post1",
+    "pytest-asyncio==1.5.0",
     "pytest-cov==7.1.0",
     "pytest-mock==3.17.0",
-    "coverage[toml]==7.17.2",
+    "coverage[toml]==7.17.3",
     "httpx==0.28.1",  # used only by tests; not imported by app/
-    "ruff==0.17.4",  # the backend-lint pre-commit hook runs this (#561)
+    "ruff==0.17.5",  # the backend-lint pre-commit hook runs this (#561)
 ]
 load = [
     # locust <2.46 caps gevent below 26, which collides with the gevent floor in
